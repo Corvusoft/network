@@ -45,16 +45,18 @@ namespace corvusoft
                 //Constructors
                 
                 //Functionality
-                virtual std::error_code teardown( void ) noexcept = 0;
+                virtual std::error_code teardown( void ) = 0;
+                
+                virtual std::error_code setup( const std::shared_ptr< const core::Settings >& settings = nullptr ) = 0;
                 
                 virtual std::error_code setup( const std::shared_ptr< core::RunLoop >& runloop,
-                                               const std::shared_ptr< const core::Settings >& settings = nullptr ) noexcept = 0;
+                                               const std::shared_ptr< const core::Settings >& settings = nullptr ) = 0;
                                                
                 virtual std::error_code close( void ) = 0;
                 
                 virtual std::error_code open( const std::shared_ptr< const core::Settings >& settings ) = 0;
                 
-                virtual std::error_code listen( const std::shared_ptr< const core::Settings >& settings, const std::function< std::error_code ( const std::shared_ptr< Adaptor > ) >& setup ) = 0;
+                virtual std::error_code listen( const std::shared_ptr< const core::Settings >& settings = nullptr ) = 0;
                 
                 virtual const core::Bytes peek( std::error_code& error ) = 0;
                 
@@ -63,11 +65,13 @@ namespace corvusoft
                 virtual std::size_t produce( const core::Bytes& data, std::error_code& error ) = 0;
                 
                 //Getters
-                virtual std::string get_name( void ) const = 0;
+                virtual std::string get_key( void ) const = 0;
                 
                 virtual std::string get_local_endpoint( void ) = 0;
                 
                 virtual std::string get_remote_endpoint( void ) = 0;
+                
+                virtual std::shared_ptr< core::RunLoop > get_runloop( void ) = 0;
                 
                 //Setters
                 virtual void set_open_handler( const std::function< void ( const std::shared_ptr< Adaptor > ) >& ) = 0;
@@ -88,7 +92,7 @@ namespace corvusoft
                 //Definitions
                 
                 //Constructors
-                Adaptor( void )
+                Adaptor( const std::string& )
                 {
                     return;
                 };

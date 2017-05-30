@@ -51,18 +51,20 @@ namespace corvusoft
                 virtual ~TCPIPAdaptor( void );
                 
                 //Functionality
-                static std::shared_ptr< Adaptor > create( void );
+                static std::shared_ptr< Adaptor > create( const std::string& key = "TCPIP" );
                 
-                virtual std::error_code teardown( void ) noexcept override;
+                virtual std::error_code teardown( void ) override;
+                
+                virtual std::error_code setup( const std::shared_ptr< const core::Settings >& settings = nullptr ) override;
                 
                 virtual std::error_code setup( const std::shared_ptr< core::RunLoop >& runloop,
-                                               const std::shared_ptr< const core::Settings >& settings = nullptr ) noexcept override;
+                                               const std::shared_ptr< const core::Settings >& settings = nullptr ) override;
                                                
                 virtual std::error_code close( void ) override;
                 
                 virtual std::error_code open( const std::shared_ptr< const core::Settings >& settings ) override;
                 
-                virtual std::error_code listen( const std::shared_ptr< const core::Settings >& settings, const std::function< std::error_code ( const std::shared_ptr< Adaptor > ) >& init ) override;
+                virtual std::error_code listen( const std::shared_ptr< const core::Settings >& settings ) override;
                 
                 virtual const core::Bytes peek( std::error_code& error ) override;
                 
@@ -71,11 +73,13 @@ namespace corvusoft
                 virtual std::size_t produce( const core::Bytes& data, std::error_code& error ) override;
                 
                 //Getters
-                virtual std::string get_name( void ) const override;
+                virtual std::string get_key( void ) const override;
                 
                 virtual std::string get_local_endpoint( void ) override;
                 
                 virtual std::string get_remote_endpoint( void ) override;
+                
+                virtual std::shared_ptr< core::RunLoop > get_runloop( void ) override;
                 
                 //Setters
                 virtual void set_open_handler( const std::function< void ( const std::shared_ptr< Adaptor > ) >& value ) override;
@@ -113,7 +117,7 @@ namespace corvusoft
                 //Definitions
                 
                 //Constructors
-                TCPIPAdaptor( void );
+                TCPIPAdaptor( const std::string& key );
                 
                 TCPIPAdaptor( const TCPIPAdaptor& original ) = delete;
                 

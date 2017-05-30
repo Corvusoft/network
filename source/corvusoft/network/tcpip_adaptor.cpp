@@ -50,9 +50,9 @@ namespace corvusoft
 {
     namespace network
     {
-        shared_ptr< Adaptor > TCPIPAdaptor::create( void )
+        shared_ptr< Adaptor > TCPIPAdaptor::create( const string& key )
         {
-            return shared_ptr< TCPIPAdaptor >( new TCPIPAdaptor( ) );
+            return shared_ptr< TCPIPAdaptor >( new TCPIPAdaptor( key ) );
         }
         
         TCPIPAdaptor::~TCPIPAdaptor( void )
@@ -67,80 +67,103 @@ namespace corvusoft
             }
         }
         
-        error_code TCPIPAdaptor::teardown( void ) noexcept
+        error_code TCPIPAdaptor::teardown( void )
         {
+            m_pimpl->is_in_use = false;
+            close( );
             return error_code( );
         }
         
-        error_code TCPIPAdaptor::setup( const shared_ptr< RunLoop >& runloop, const shared_ptr< const Settings >& ) noexcept
+        error_code TCPIPAdaptor::setup( const shared_ptr< const Settings >& settings )
         {
-            m_pimpl->runloop = runloop; //set a default runloop otherwise
+            return setup( nullptr, settings );
+        }
+        
+        error_code TCPIPAdaptor::setup( const shared_ptr< RunLoop >& runloop, const shared_ptr< const Settings >& )
+        {
+            m_pimpl->runloop = runloop;
             return error_code( );
         }
         
         error_code TCPIPAdaptor::close( void )
         {
-            //if ( m_pimpl->runloop not_eq nullptr )
-            //m_pimpl->runloop->cancel( m_pimpl->key ); //we need to set a key, Key::make_key( );?
+            m_pimpl->is_closed = true;
+            m_pimpl->is_in_use = false;
+            const int status = ::close( m_pimpl->peer.fd );// shutdown is better?, SHUT_RDWR );
             
-            const int status = ::close( m_pimpl->peer.fd );
-            if ( status < 0 )
-                return m_pimpl->error( errno );
+            if ( m_pimpl->runloop not_eq nullptr )
+            {
+                m_pimpl->runloop->cancel( m_pimpl->key );
                 
-            return error_code( );
+                if ( m_pimpl->close_handler not_eq nullptr )
+                    m_pimpl->runloop->launch( [ this ]( )
+                {
+                    m_pimpl->close_handler( );
+                    return error_code( );
+                } );
+            }
+            
+            return ( status == -1 ) ? m_pimpl->error( errno, false ) : error_code( );
         }
         
         error_code TCPIPAdaptor::open( const shared_ptr< const Settings >& settings )
         {
-            assert( settings not_eq nullptr );
-            if ( m_pimpl->peer.events == 0 ) return error_code( );
+            if ( m_pimpl->is_in_use ) return make_error_code( std::errc::already_connected );
+            if ( settings == nullptr ) return make_error_code( std::errc::invalid_argument );
             
-            const string address = settings->get_property( "address" );
-            const unsigned int port = settings->get_property( "port", 0 );
+            if ( m_pimpl->runloop == nullptr ) m_pimpl->runloop = make_shared< RunLoop >( );
+            //if ( m_pimpl->peer.events == 0 ) return error_code( );
             
-            m_pimpl->runloop->launch( [ this, address, port ]( )
-            {
-                struct pollfd peer;
-                peer.revents = 0;
-                peer.fd = socket( AF_INET, SOCK_STREAM, 0 );
-                if ( peer.fd < 0 ) return m_pimpl->error( errno );
-                
-                int status = fcntl( peer.fd, F_SETFL, fcntl( peer.fd, F_GETFL, 0 ) | O_NONBLOCK );
-                if ( status < 0 ) return m_pimpl->error( errno );
-                
-                const socklen_t length = sizeof( struct sockaddr_in );
-                
-                struct sockaddr_in endpoint;
-                memset( &endpoint, 0, length );
-                endpoint.sin_family = AF_INET;
-                endpoint.sin_port = htons( port );
-                
-                status = inet_pton( AF_INET, address.data( ), &( endpoint.sin_addr.s_addr ) );
-                if ( status == 0 ) return m_pimpl->error( errno );
-                
-                status = connect( peer.fd, reinterpret_cast< struct sockaddr* >( &endpoint ), length );
-                if ( status == -1 and errno not_eq EINPROGRESS ) return m_pimpl->error( errno );
-                
-                m_pimpl->buffer = make_bytes( );
-                m_pimpl->peer = peer;
-                m_pimpl->endpoint = endpoint;
-                m_pimpl->runloop->launch( bind( TCPIPAdaptorImpl::event_monitor, m_pimpl ) );
-                
-                return error_code( );
-            } );
+            const string address = settings->get( "address" );
+            const unsigned int port = settings->get( "port", 0 );
+            
+            //m_pimpl->runloop->launch( [ this, address, port ]( )
+            //{
+            struct pollfd peer;
+            peer.revents = 0;
+            peer.fd = socket( AF_INET, SOCK_STREAM, 0 );
+            if ( peer.fd < 0 ) return m_pimpl->error( errno );
+            
+            int status = fcntl( peer.fd, F_SETFL, fcntl( peer.fd, F_GETFL, 0 ) | O_NONBLOCK );
+            if ( status < 0 ) return m_pimpl->error( errno );
+            
+            const socklen_t length = sizeof( struct sockaddr_in );
+            
+            struct sockaddr_in endpoint;
+            memset( &endpoint, 0, length );
+            endpoint.sin_family = AF_INET;
+            endpoint.sin_port = htons( port );
+            
+            status = inet_pton( AF_INET, address.data( ), &( endpoint.sin_addr.s_addr ) );
+            if ( status == 0 ) return m_pimpl->error( errno );
+            
+            status = connect( peer.fd, reinterpret_cast< struct sockaddr* >( &endpoint ), length );
+            if ( status == -1 and errno not_eq EINPROGRESS ) return m_pimpl->error( errno );
+            
+            m_pimpl->buffer = make_bytes( );
+            m_pimpl->peer = peer;
+            m_pimpl->endpoint = endpoint;
+            m_pimpl->runloop->launch( bind( TCPIPAdaptorImpl::event_monitor, m_pimpl ), m_pimpl->key );
             
             return error_code( );
+            //}, m_pimpl->key );
+            
+            //return error_code( );
         }
         
-        error_code TCPIPAdaptor::listen( const shared_ptr< const Settings >& settings, const function< error_code ( const shared_ptr< Adaptor > ) >& init )
+        error_code TCPIPAdaptor::listen( const shared_ptr< const Settings >& settings )
         {
-            assert( init not_eq nullptr );
-            assert( settings not_eq nullptr );
+            if ( m_pimpl->is_in_use ) return make_error_code( std::errc::already_connected );
+            if ( m_pimpl->runloop == nullptr ) m_pimpl->runloop = make_shared< RunLoop >( );
             
-            const unsigned int port = settings->get_property( "port", 0 );
-            const int backlog = settings->get_property( "backlog", SOMAXCONN );
+            shared_ptr< const Settings > options = settings;
+            if ( options == nullptr ) options = make_shared< Settings >( );
             
-            m_pimpl->message_handler = [ this, init, settings ]
+            const unsigned int port = options->get( "port", 0 );
+            const int backlog = options->get( "backlog", SOMAXCONN );
+            //const string bind_address = options->get( "address", "" );
+            
+            m_pimpl->message_handler = [ this, settings ]
             {
                 static socklen_t length = sizeof( struct sockaddr_in );
                 struct sockaddr_in endpoint;
@@ -150,7 +173,7 @@ namespace corvusoft
                 peer.revents = 0;
                 peer.events = 0;
                 peer.fd = accept( m_pimpl->peer.fd, reinterpret_cast< struct sockaddr* >( &endpoint ), &length );
-                if ( peer.fd < 0 )
+                if ( peer.fd < 0 ) //test also if eagin or ewouldblock and just return, no error;
                 {
                     m_pimpl->error( errno );
                     return;
@@ -163,56 +186,62 @@ namespace corvusoft
                     return;
                 }
                 
-                auto adaptor = shared_ptr< TCPIPAdaptor >( new TCPIPAdaptor );
+                auto adaptor = shared_ptr< TCPIPAdaptor >( new TCPIPAdaptor( "" ) ); //generate random key? no use address:port
                 adaptor->setup( m_pimpl->runloop, settings );
                 adaptor->m_pimpl->peer = peer;
-                adaptor->m_pimpl->buffer = make_bytes( );
+                //adaptor->m_pimpl->parent = shared_from_this( );
+                //adaptor->m_pimpl->buffer = make_bytes( ); //not required as its setup in the pimpl. is this to clear it????
                 adaptor->m_pimpl->endpoint = endpoint;
-                init( adaptor ); //adaptor must be writable here! test for error code and if present terminate adaptor!
-                m_pimpl->runloop->launch( bind( TCPIPAdaptorImpl::event_monitor, adaptor->m_pimpl ) );
+                //m_pimpl->children.push_back( adaptor );
+                
+                //the name could be the unique address:port string from get_remote_endpoint
+                m_pimpl->runloop->launch( bind( TCPIPAdaptorImpl::event_monitor, adaptor->m_pimpl ), m_pimpl->key );
             };
             
-            m_pimpl->runloop->launch( [ this, port, backlog ]( )
+            //m_pimpl->runloop->launch( [ this, port, backlog ]( )
+            //{
+            m_pimpl->peer.revents = 0;
+            m_pimpl->peer.events = POLLIN | POLLPRI | POLLOUT | POLLERR | POLLHUP | POLLNVAL | POLLRDBAND | POLLRDNORM | POLLWRBAND | POLLWRNORM;
+            m_pimpl->peer.fd = socket( AF_INET, SOCK_STREAM, 0 );
+            if ( m_pimpl->peer.fd < 0 ) return m_pimpl->error( errno );
+            
+            int status = fcntl( m_pimpl->peer.fd, F_SETFL, fcntl( m_pimpl->peer.fd, F_GETFL, 0 ) | O_NONBLOCK );
+            if ( status < 0 ) return m_pimpl->error( errno );
+            
+            status = 1;
+            status = setsockopt( m_pimpl->peer.fd, SOL_SOCKET, SO_REUSEADDR, &status, sizeof( status ) );
+            if ( status == -1 ) return m_pimpl->error( errno );
+            
+            const socklen_t length = sizeof( struct sockaddr_in );
+            
+            struct sockaddr_in endpoint;
+            memset( &endpoint, 0, length );
+            endpoint.sin_family = AF_INET;
+            endpoint.sin_port = htons( port );
+            endpoint.sin_addr.s_addr = INADDR_ANY;
+            
+            status = bind( m_pimpl->peer.fd, reinterpret_cast< struct sockaddr* >( &endpoint ), length );
+            if ( status == -1 ) return m_pimpl->error( errno );
+            
+            status = ::listen( m_pimpl->peer.fd, backlog );
+            if ( status == -1 ) return m_pimpl->error( errno );
+            
+            m_pimpl->endpoint = endpoint;
+            m_pimpl->runloop->launch( bind( TCPIPAdaptorImpl::event_monitor, m_pimpl ), m_pimpl->key );
+            
+            m_pimpl->is_in_use = true;
+            
+            if ( m_pimpl->open_handler not_eq nullptr )
+                m_pimpl->runloop->launch( [ this ]( )
             {
-                m_pimpl->peer.revents = 0;
-                m_pimpl->peer.events |= POLLIN | POLLPRI;
-                m_pimpl->peer.fd = socket( AF_INET, SOCK_STREAM, 0 );
-                if ( m_pimpl->peer.fd < 0 ) return m_pimpl->error( errno );
-                
-                int status = fcntl( m_pimpl->peer.fd, F_SETFL, fcntl( m_pimpl->peer.fd, F_GETFL, 0 ) | O_NONBLOCK );
-                if ( status < 0 ) return m_pimpl->error( errno );
-                
-                status = 1;
-                status = setsockopt( m_pimpl->peer.fd, SOL_SOCKET, SO_REUSEADDR, &status, sizeof( status ) );
-                if ( status == -1 ) return m_pimpl->error( errno );
-                
-                const socklen_t length = sizeof( struct sockaddr_in );
-                
-                struct sockaddr_in endpoint;
-                memset( &endpoint, 0, length );
-                endpoint.sin_family = AF_INET;
-                endpoint.sin_port = htons( port );
-                endpoint.sin_addr.s_addr = INADDR_ANY;
-                
-                status = bind( m_pimpl->peer.fd, reinterpret_cast< struct sockaddr* >( &endpoint ), length );
-                if ( status == -1 ) return m_pimpl->error( errno );
-                
-                status = ::listen( m_pimpl->peer.fd, backlog );
-                if ( status == -1 ) return m_pimpl->error( errno );
-                
-                m_pimpl->endpoint = endpoint;
-                m_pimpl->runloop->launch( bind( TCPIPAdaptorImpl::event_monitor, m_pimpl ) );
-                
-                if ( ( m_pimpl->peer.events | POLLOUT ) and m_pimpl->open_handler not_eq nullptr )
-                {
-                    m_pimpl->peer.events ^= POLLOUT;
-                    m_pimpl->open_handler( );
-                }
-                
+                m_pimpl->open_handler( );
                 return error_code( );
-            } );
+            } ); //remove wrapper? static
             
             return error_code( );
+            //}, m_pimpl->key );
+            
+            //return error_code( );
         }
         
         const Bytes TCPIPAdaptor::peek( error_code& error )
@@ -241,7 +270,7 @@ namespace corvusoft
                 if ( size < 0 )
                 {
                     error = m_pimpl->error( errno, ( errno not_eq EAGAIN ) );
-                    size = 0;
+                    //size = 0;
                     break;
                 }
                 
@@ -272,15 +301,13 @@ namespace corvusoft
             return size;
         }
         
-        string TCPIPAdaptor::get_name( void ) const
+        string TCPIPAdaptor::get_key( void ) const
         {
-            return "TCPIP";
+            return m_pimpl->key;
         }
         
         string TCPIPAdaptor::get_local_endpoint( void )
         {
-            if ( m_pimpl->runloop == nullptr ) return "";
-            
             const uint16_t port = ntohs( m_pimpl->endpoint.sin_port );
             const string address = inet_ntoa( m_pimpl->endpoint.sin_addr );
             //if version 6 and brackets [::1]:80
@@ -289,59 +316,67 @@ namespace corvusoft
         
         string TCPIPAdaptor::get_remote_endpoint( void )
         {
-            if ( m_pimpl->runloop == nullptr ) return "";
+            struct sockaddr_in endpoint;
+            socklen_t size = sizeof( endpoint );
             
-            return "";
+            getpeername( m_pimpl->peer.fd, reinterpret_cast< struct sockaddr*>( &endpoint ), &size );
+            
+            const uint16_t port = ntohs( endpoint.sin_port );
+            const string address = inet_ntoa( endpoint.sin_addr );
+            //if version 6 and brackets [::1]:80
+            return address + ":" + to_string( port );
+        }
+        
+        shared_ptr< RunLoop > TCPIPAdaptor::get_runloop( void )
+        {
+            return m_pimpl->runloop;
         }
         
         void TCPIPAdaptor::set_open_handler( const function< void ( const shared_ptr< Adaptor > ) >& value )
         {
-            if ( value == nullptr )
-                m_pimpl->open_handler = nullptr;
-            else
-                m_pimpl->open_handler = bind( value, shared_from_this( ) );
-                
-            m_pimpl->peer.events ^= POLLOUT;
+            if ( value == nullptr ) m_pimpl->open_handler = nullptr;
+            else m_pimpl->open_handler = bind( value, shared_from_this( ) );
+            
+            //m_pimpl->peer.events ^= POLLOUT;
         }
         
         void TCPIPAdaptor::set_close_handler( const function< void ( const shared_ptr< Adaptor > ) >& value )
         {
-            if ( value == nullptr )
-                m_pimpl->close_handler = nullptr;
-            else
-                m_pimpl->close_handler = bind( value, shared_from_this( ) );
-                
-            m_pimpl->peer.events ^= POLLHUP; //POLLRDHUP | POLLHUP; RDHUP is GNU specific.
+            if ( value == nullptr ) m_pimpl->close_handler = nullptr;
+            //else m_pimpl->close_handler = bind( value, shared_from_this( ) );
+            else m_pimpl->close_handler = [ this, value ]
+            {
+                m_pimpl->is_in_use = false;
+                value( shared_from_this( ) );
+            };
+            
+            //m_pimpl->peer.events ^= POLLHUP; //POLLRDHUP | POLLHUP; RDHUP is GNU specific.
         }
         
         void TCPIPAdaptor::set_error_handler( const function< void ( const shared_ptr< Adaptor >, const error_code error ) >& value )
         {
-            if ( value == nullptr )
-                m_pimpl->error_handler = nullptr;
-            else
-                m_pimpl->error_handler = bind( value, shared_from_this( ), _1 );
-                
-            m_pimpl->peer.events ^= POLLERR | POLLNVAL; //do we not always want to catch this and call our error handler, yes.
+            if ( value == nullptr ) m_pimpl->error_handler = nullptr;
+            else m_pimpl->error_handler = bind( value, shared_from_this( ), _1 );
+            
+            //m_pimpl->peer.events ^= POLLERR | POLLNVAL; //do we not always want to catch this and call our error handler, yes.
         }
         
         void TCPIPAdaptor::set_message_handler( const function< void ( const shared_ptr< Adaptor > ) >& value )
         {
-            if ( value == nullptr )
-                m_pimpl->message_handler = nullptr;
-            else
-                m_pimpl->message_handler = [ this, value ]
+            if ( value == nullptr ) m_pimpl->message_handler = nullptr;
+            else m_pimpl->message_handler = [ this, value ]
             {
                 //consume( ); //this will have broken something.
                 value( shared_from_this( ) );
             };
             
-            m_pimpl->peer.events ^= POLLIN | POLLPRI;
+            //m_pimpl->peer.events ^= POLLIN | POLLPRI; //what about when we nullptr the value? need to clear them bits.
         }
         
-        TCPIPAdaptor::TCPIPAdaptor( void ) : Adaptor( ),
+        TCPIPAdaptor::TCPIPAdaptor( const string& key ) : Adaptor( key ),
             m_pimpl( new TCPIPAdaptorImpl )
         {
-            return;
+            m_pimpl->key = key;
         }
     }
 }
