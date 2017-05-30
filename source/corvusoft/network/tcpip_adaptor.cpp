@@ -112,13 +112,10 @@ namespace corvusoft
             if ( settings == nullptr ) return make_error_code( std::errc::invalid_argument );
             
             if ( m_pimpl->runloop == nullptr ) m_pimpl->runloop = make_shared< RunLoop >( );
-            //if ( m_pimpl->peer.events == 0 ) return error_code( );
             
             const string address = settings->get( "address" );
             const unsigned int port = settings->get( "port", 0 );
             
-            //m_pimpl->runloop->launch( [ this, address, port ]( )
-            //{
             struct pollfd peer;
             peer.revents = 0;
             peer.fd = socket( AF_INET, SOCK_STREAM, 0 );
@@ -146,9 +143,6 @@ namespace corvusoft
             m_pimpl->runloop->launch( bind( TCPIPAdaptorImpl::event_monitor, m_pimpl ), m_pimpl->key );
             
             return error_code( );
-            //}, m_pimpl->key );
-            
-            //return error_code( );
         }
         
         error_code TCPIPAdaptor::listen( const shared_ptr< const Settings >& settings )
@@ -161,7 +155,6 @@ namespace corvusoft
             
             const unsigned int port = options->get( "port", 0 );
             const int backlog = options->get( "backlog", SOMAXCONN );
-            //const string bind_address = options->get( "address", "" );
             
             m_pimpl->message_handler = [ this, settings ]
             {
@@ -189,17 +182,11 @@ namespace corvusoft
                 auto adaptor = shared_ptr< TCPIPAdaptor >( new TCPIPAdaptor( "" ) ); //generate random key? no use address:port
                 adaptor->setup( m_pimpl->runloop, settings );
                 adaptor->m_pimpl->peer = peer;
-                //adaptor->m_pimpl->parent = shared_from_this( );
-                //adaptor->m_pimpl->buffer = make_bytes( ); //not required as its setup in the pimpl. is this to clear it????
                 adaptor->m_pimpl->endpoint = endpoint;
-                //m_pimpl->children.push_back( adaptor );
                 
-                //the name could be the unique address:port string from get_remote_endpoint
                 m_pimpl->runloop->launch( bind( TCPIPAdaptorImpl::event_monitor, adaptor->m_pimpl ), m_pimpl->key );
             };
             
-            //m_pimpl->runloop->launch( [ this, port, backlog ]( )
-            //{
             m_pimpl->peer.revents = 0;
             m_pimpl->peer.events = POLLIN | POLLPRI | POLLOUT | POLLERR | POLLHUP | POLLNVAL | POLLRDBAND | POLLRDNORM | POLLWRBAND | POLLWRNORM;
             m_pimpl->peer.fd = socket( AF_INET, SOCK_STREAM, 0 );
@@ -239,9 +226,6 @@ namespace corvusoft
             } ); //remove wrapper? static
             
             return error_code( );
-            //}, m_pimpl->key );
-            
-            //return error_code( );
         }
         
         const Bytes TCPIPAdaptor::peek( error_code& error )
@@ -270,7 +254,6 @@ namespace corvusoft
                 if ( size < 0 )
                 {
                     error = m_pimpl->error( errno, ( errno not_eq EAGAIN ) );
-                    //size = 0;
                     break;
                 }
                 
@@ -336,29 +319,22 @@ namespace corvusoft
         {
             if ( value == nullptr ) m_pimpl->open_handler = nullptr;
             else m_pimpl->open_handler = bind( value, shared_from_this( ) );
-            
-            //m_pimpl->peer.events ^= POLLOUT;
         }
         
         void TCPIPAdaptor::set_close_handler( const function< void ( const shared_ptr< Adaptor > ) >& value )
         {
             if ( value == nullptr ) m_pimpl->close_handler = nullptr;
-            //else m_pimpl->close_handler = bind( value, shared_from_this( ) );
             else m_pimpl->close_handler = [ this, value ]
             {
                 m_pimpl->is_in_use = false;
                 value( shared_from_this( ) );
             };
-            
-            //m_pimpl->peer.events ^= POLLHUP; //POLLRDHUP | POLLHUP; RDHUP is GNU specific.
         }
         
         void TCPIPAdaptor::set_error_handler( const function< void ( const shared_ptr< Adaptor >, const error_code error ) >& value )
         {
             if ( value == nullptr ) m_pimpl->error_handler = nullptr;
             else m_pimpl->error_handler = bind( value, shared_from_this( ), _1 );
-            
-            //m_pimpl->peer.events ^= POLLERR | POLLNVAL; //do we not always want to catch this and call our error handler, yes.
         }
         
         void TCPIPAdaptor::set_message_handler( const function< void ( const shared_ptr< Adaptor > ) >& value )
@@ -366,11 +342,8 @@ namespace corvusoft
             if ( value == nullptr ) m_pimpl->message_handler = nullptr;
             else m_pimpl->message_handler = [ this, value ]
             {
-                //consume( ); //this will have broken something.
                 value( shared_from_this( ) );
             };
-            
-            //m_pimpl->peer.events ^= POLLIN | POLLPRI; //what about when we nullptr the value? need to clear them bits.
         }
         
         TCPIPAdaptor::TCPIPAdaptor( const string& key ) : Adaptor( key ),

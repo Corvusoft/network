@@ -101,10 +101,10 @@ TEST_CASE( "Close" )
 {
     auto adaptor = TCPIPAdaptor::create( );
     auto status = adaptor->close( );
-    REQUIRE( status == error_code( ) );
+    REQUIRE( status == std::errc::bad_file_descriptor );
     
     status = adaptor->close( );
-    REQUIRE( status == error_code( ) );
+    REQUIRE( status == std::errc::bad_file_descriptor  );
 }
 
 TEST_CASE( "Open" )
@@ -113,9 +113,10 @@ TEST_CASE( "Open" )
     auto status = adaptor->open( nullptr );
     REQUIRE( status == std::errc::invalid_argument );
     
-    auto settings = make_shared< Settings >( );
-    status = adaptor->open( settings );
-    REQUIRE( status == error_code( ) );
+    //auto settings = make_shared< Settings >( );
+    //status = adaptor->open( settings );
+    //REQUIRE( status == std::errc::invalid_argument );
+    // REQUIRE( status.message( ) == "address and/or port is malformed." );
     
     // settings->set( "port", -1 );
     // status = adaptor->open( settings );
@@ -132,13 +133,16 @@ TEST_CASE( "Listen" )
 {
     auto adaptor = TCPIPAdaptor::create( );
     auto status = adaptor->listen( );
+    adaptor->close( );
     REQUIRE( status == error_code( ) );
     
     status = adaptor->listen( nullptr );
     REQUIRE( status == error_code( ) );
+    adaptor->close( );
     
     auto settings = make_shared< Settings >( );
     status = adaptor->listen( settings );
+    adaptor->close( );
     REQUIRE( status == error_code( ) );
     
     // settings->set( "port", -1 );
