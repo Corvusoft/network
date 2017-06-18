@@ -12,6 +12,7 @@
 #include <arpa/inet.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <netinet/tcp.h>
 
 //Project Includes
 #include "corvusoft/network/tcpip_adaptor.hpp"
@@ -89,7 +90,8 @@ namespace corvusoft
         {
             m_pimpl->is_closed = true;
             m_pimpl->is_in_use = false;
-            const int status = ::close( m_pimpl->peer.fd );// shutdown is better?, SHUT_RDWR );
+            
+            const int status = ::close( m_pimpl->peer.fd );
             
             if ( m_pimpl->runloop not_eq nullptr )
             {
@@ -106,36 +108,52 @@ namespace corvusoft
             return ( status == -1 ) ? m_pimpl->error( errno, false ) : error_code( );
         }
         
+        //document port will be truncated if negative.
         error_code TCPIPAdaptor::open( const shared_ptr< const Settings >& settings )
         {
-            if ( m_pimpl->is_in_use ) return make_error_code( std::errc::already_connected );
-            if ( settings == nullptr ) return make_error_code( std::errc::invalid_argument );
+            if ( m_pimpl->is_in_use ) return make_error_code( std::errc::already_connected ); //message required
+            if ( settings == nullptr ) return make_error_code( std::errc::invalid_argument ); //message required
+            
+            if ( not settings->has( "port" ) ) return make_error_code( std::errc::invalid_argument ); //"address and/or port is malformed."
+            if ( not settings->has( "address" ) ) return make_error_code( std::errc::invalid_argument ); //"address is malformed, expected IPv4/6 string."
             
             if ( m_pimpl->runloop == nullptr ) m_pimpl->runloop = make_shared< RunLoop >( );
             
             const string address = settings->get( "address" );
-            const unsigned int port = settings->get( "port", 0 );
+            const short port = settings->get( "port", 0 );
+            //socket timeout.
             
             struct pollfd peer;
             peer.revents = 0;
-            peer.fd = socket( AF_INET, SOCK_STREAM, 0 );
+            peer.events = POLLIN | POLLPRI | POLLOUT | POLLERR | POLLHUP | POLLNVAL;
+            peer.fd = socket( PF_INET, SOCK_STREAM, IPPROTO_TCP );
             if ( peer.fd < 0 ) return m_pimpl->error( errno );
-            
-            int status = fcntl( peer.fd, F_SETFL, fcntl( peer.fd, F_GETFL, 0 ) | O_NONBLOCK );
-            if ( status < 0 ) return m_pimpl->error( errno );
             
             const socklen_t length = sizeof( struct sockaddr_in );
             
             struct sockaddr_in endpoint;
             memset( &endpoint, 0, length );
-            endpoint.sin_family = AF_INET;
+            endpoint.sin_family = PF_INET;
             endpoint.sin_port = htons( port );
             
-            status = inet_pton( AF_INET, address.data( ), &( endpoint.sin_addr.s_addr ) );
+            int status = inet_pton( PF_INET, address.data( ), &( endpoint.sin_addr.s_addr ) );
             if ( status == 0 ) return m_pimpl->error( errno );
             
             status = connect( peer.fd, reinterpret_cast< struct sockaddr* >( &endpoint ), length );
-            if ( status == -1 and errno not_eq EINPROGRESS ) return m_pimpl->error( errno );
+            if ( status == -1 ) return m_pimpl->error( errno );
+            
+            int val = 1;
+            setsockopt( peer.fd, IPPROTO_TCP, SO_KEEPALIVE, &val, sizeof val );
+            
+            status = fcntl( peer.fd, F_SETFL, fcntl( peer.fd, F_GETFL, 0 ) | O_NONBLOCK ); //remove inner fcntl
+            if ( status < 0 ) return m_pimpl->error( errno );
+            
+            //if null leave null
+            const auto message_handler = m_pimpl->original_message_handler;
+            m_pimpl->message_handler = [ this, message_handler ]
+            {
+                message_handler( shared_from_this( ) );
+            };
             
             m_pimpl->buffer = make_bytes( );
             m_pimpl->peer = peer;
@@ -145,6 +163,10 @@ namespace corvusoft
             return error_code( );
         }
         
+        /*
+         * note in documentation, setting a port, etc.. to a negative value will be converted signed int.
+         * backlog is limited to 128
+         */
         error_code TCPIPAdaptor::listen( const shared_ptr< const Settings >& settings )
         {
             if ( m_pimpl->is_in_use ) return make_error_code( std::errc::already_connected );
@@ -153,18 +175,22 @@ namespace corvusoft
             shared_ptr< const Settings > options = settings;
             if ( options == nullptr ) options = make_shared< Settings >( );
             
-            const unsigned int port = options->get( "port", 0 );
-            const int backlog = options->get( "backlog", SOMAXCONN );
+            const unsigned short port = options->get( "port", 0 );
+            const unsigned int backlog = options->get( "backlog", SOMAXCONN );
+            //socket timeout.
             
-            m_pimpl->message_handler = [ this, settings ]
+            ///m_pimpl->message_handler = accept_handler;
+            const auto message_handler = m_pimpl->original_message_handler;
+            m_pimpl->message_handler = [ this, settings, message_handler ]
             {
+                fprintf( stderr, "accept handler called\n" );
                 static socklen_t length = sizeof( struct sockaddr_in );
                 struct sockaddr_in endpoint;
                 memset( &endpoint, 0, length );
                 
                 struct pollfd peer;
                 peer.revents = 0;
-                peer.events = 0;
+                peer.events = POLLIN | POLLPRI | POLLOUT | POLLERR | POLLHUP | POLLNVAL;
                 peer.fd = accept( m_pimpl->peer.fd, reinterpret_cast< struct sockaddr* >( &endpoint ), &length );
                 if ( peer.fd < 0 ) //test also if eagin or ewouldblock and just return, no error;
                 {
@@ -172,28 +198,48 @@ namespace corvusoft
                     return;
                 }
                 
-                int status = fcntl( peer.fd, F_SETFL, fcntl( peer.fd, F_GETFL, 0 ) | O_NONBLOCK );
+                const int status = fcntl( peer.fd, F_SETFL, fcntl( peer.fd, F_GETFL, 0 ) | O_NONBLOCK ); //extract inner fcntl!!!
                 if ( status < 0 )
                 {
                     m_pimpl->error( errno );
                     return;
                 }
                 
-                auto adaptor = shared_ptr< TCPIPAdaptor >( new TCPIPAdaptor( "" ) ); //generate random key? no use address:port
+                int val = 1;
+                setsockopt( peer.fd, IPPROTO_TCP, SO_KEEPALIVE, &val, sizeof val );
+                
+                auto adaptor = shared_ptr< TCPIPAdaptor >( new TCPIPAdaptor( "child" ) ); //generate random key? no use address:port
                 adaptor->setup( m_pimpl->runloop, settings );
                 adaptor->m_pimpl->peer = peer;
                 adaptor->m_pimpl->endpoint = endpoint;
+                adaptor->m_pimpl->message_handler = [ adaptor, message_handler ] //bind?
+                {
+                    message_handler( adaptor );
+                };
+                adaptor->m_pimpl->error_handler = [ ]( error_code )
+                {
+                    fprintf( stderr, "[child] error handler called.\n" );
+                };
+                adaptor->m_pimpl->close_handler = [ ]
+                {
+                    fprintf( stderr, "[child] close handler called.\n" );
+                };
+                
+                fprintf( stderr, "CHILD WITH FD %d\n", adaptor->m_pimpl->peer.fd );
                 
                 m_pimpl->runloop->launch( bind( TCPIPAdaptorImpl::event_monitor, adaptor->m_pimpl ), m_pimpl->key );
             };
             
             m_pimpl->peer.revents = 0;
-            m_pimpl->peer.events = POLLIN | POLLPRI | POLLOUT | POLLERR | POLLHUP | POLLNVAL | POLLRDBAND | POLLRDNORM | POLLWRBAND | POLLWRNORM;
-            m_pimpl->peer.fd = socket( AF_INET, SOCK_STREAM, 0 );
+            m_pimpl->peer.events = POLLIN | POLLPRI | POLLOUT | POLLERR | POLLHUP | POLLNVAL;
+            m_pimpl->peer.fd = socket( PF_INET, SOCK_STREAM, IPPROTO_TCP );
             if ( m_pimpl->peer.fd < 0 ) return m_pimpl->error( errno );
             
             int status = fcntl( m_pimpl->peer.fd, F_SETFL, fcntl( m_pimpl->peer.fd, F_GETFL, 0 ) | O_NONBLOCK );
             if ( status < 0 ) return m_pimpl->error( errno );
+            
+            int val = 1;
+            setsockopt( m_pimpl->peer.fd, IPPROTO_TCP, SO_KEEPALIVE, &val, sizeof val );
             
             status = 1;
             status = setsockopt( m_pimpl->peer.fd, SOL_SOCKET, SO_REUSEADDR, &status, sizeof( status ) );
@@ -203,7 +249,7 @@ namespace corvusoft
             
             struct sockaddr_in endpoint;
             memset( &endpoint, 0, length );
-            endpoint.sin_family = AF_INET;
+            endpoint.sin_family = PF_INET;
             endpoint.sin_port = htons( port );
             endpoint.sin_addr.s_addr = INADDR_ANY;
             
@@ -218,14 +264,14 @@ namespace corvusoft
             
             m_pimpl->is_in_use = true;
             
-            if ( m_pimpl->open_handler not_eq nullptr )
+            if ( m_pimpl->open_handler not_eq nullptr ) //why doesnt the poll tell us this?
                 m_pimpl->runloop->launch( [ this ]( )
             {
                 m_pimpl->open_handler( );
                 return error_code( );
             } ); //remove wrapper? static
-            
-            return error_code( );
+            fprintf( stderr, "LISTEN WITH FD %d\n", m_pimpl->peer.fd );
+            return error_code( ); //send back a message "Adaptor awaiting connections at...";
         }
         
         const Bytes TCPIPAdaptor::peek( error_code& error )
@@ -250,10 +296,12 @@ namespace corvusoft
             do
             {
                 memset( data_ptr, 0, length + 1 );
-                size = recv( m_pimpl->peer.fd, data_ptr, length, 0 );
+                size = read( m_pimpl->peer.fd, data_ptr, length );
                 if ( size < 0 )
                 {
-                    error = m_pimpl->error( errno, ( errno not_eq EAGAIN ) );
+                    size = 0;
+                    if ( errno not_eq EAGAIN )
+                        error = m_pimpl->error( errno );
                     break;
                 }
                 
@@ -274,7 +322,7 @@ namespace corvusoft
         
         size_t TCPIPAdaptor::produce( const Bytes& data, error_code& error )
         {
-            ssize_t size = send( m_pimpl->peer.fd, data.data( ), data.size( ), 0 );
+            ssize_t size = write( m_pimpl->peer.fd, data.data( ), data.size( ) );
             if ( size < 0 )
             {
                 size = 0;
@@ -299,6 +347,8 @@ namespace corvusoft
         
         string TCPIPAdaptor::get_remote_endpoint( void )
         {
+            if ( not m_pimpl->is_in_use ) return get_local_endpoint( );
+            
             struct sockaddr_in endpoint;
             socklen_t size = sizeof( endpoint );
             
@@ -339,11 +389,8 @@ namespace corvusoft
         
         void TCPIPAdaptor::set_message_handler( const function< void ( const shared_ptr< Adaptor > ) >& value )
         {
-            if ( value == nullptr ) m_pimpl->message_handler = nullptr;
-            else m_pimpl->message_handler = [ this, value ]
-            {
-                value( shared_from_this( ) );
-            };
+            if ( value == nullptr ) m_pimpl->original_message_handler = nullptr;
+            else m_pimpl->original_message_handler = value;
         }
         
         TCPIPAdaptor::TCPIPAdaptor( const string& key ) : Adaptor( key ),
