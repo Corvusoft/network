@@ -65,7 +65,7 @@ namespace corvusoft
                 
                 std::function< void ( const std::error_code ) > error_handler = nullptr;
                 
-                std::error_code error( const int errnum, bool report = true ) //error_if
+                std::error_code error( const int errnum, bool report = true )
                 {
                     std::error_code error( errnum, std::system_category( ) );
                     if ( report and error_handler not_eq nullptr ) error_handler( error );
@@ -74,22 +74,12 @@ namespace corvusoft
                 
                 static std::error_code event_monitor( const std::shared_ptr< TCPIPAdaptorImpl > adaptor )
                 {
-                    if ( adaptor == nullptr ) return make_error_code( std::errc::invalid_argument );
-                    if ( adaptor->peer.events == 0 ) return std::error_code( );
-                    if ( adaptor->is_closed ) return std::error_code( );
-                    
-                    static const short open_event_mask  = POLLOUT;
-                    static const short read_event_mask  = POLLIN  | POLLPRI;
-                    static const short close_event_mask = POLLHUP;
+                    static const int TIMEOUT = 1000;
                     static const int SINGLE_FILE_DESCRIPTOR = 1;
-                    //static const int WAIT_UNTIL_EVENT_AVAILABLE = -1;
-                    static const int TIMEOUT = 1000; //have to keep this until we add a pipe for signaling.
+                    
                     const int status = poll( &( adaptor->peer ), SINGLE_FILE_DESCRIPTOR, TIMEOUT );
                     if ( adaptor->is_closed ) return std::error_code( );
                     if ( status == -1 and errno not_eq EINPROGRESS ) adaptor->error( errno );
-                    
-                    //adaptor->error_if( status == -1 and errno not_eq EINPROGRESS );
-                    fprintf( stderr, "[%s] poll events: %d status: %d errno: %d\n", adaptor->key.data( ), adaptor->peer.revents, status, errno );
                     if ( status == 1 )
                     {
                         const short events = adaptor->peer.revents;
@@ -98,21 +88,18 @@ namespace corvusoft
                             adaptor->error_handler( std::error_code( errno, std::system_category( ) ) );
                         else
                         {
-                            if ( events & open_event_mask ) //can we not have multiple events on a poll? else if is wrong! order as well!
+                            if ( events & POLLOUT )
                             {
-                                adaptor->peer.events ^= open_event_mask; //need to reset this on open/listne?
-                                if ( adaptor->open_handler not_eq nullptr )
-                                {
-                                    adaptor->open_handler( );
-                                }
+                                adaptor->peer.events ^= POLLOUT;
+                                if ( adaptor->open_handler not_eq nullptr ) adaptor->open_handler( );
                             }
                             
-                            if ( events & read_event_mask and adaptor->message_handler not_eq nullptr ) adaptor->message_handler( );
+                            if ( events & ( POLLIN | POLLPRI ) and adaptor->message_handler not_eq nullptr ) adaptor->message_handler( );
                             
-                            if ( events & close_event_mask and adaptor->close_handler not_eq nullptr  ) adaptor->close_handler( );
+                            if ( events & POLLHUP and adaptor->close_handler not_eq nullptr  ) adaptor->close_handler( );
                         }
                         
-                        adaptor->peer.revents = 0; //no! only clear the bit we processed!
+                        adaptor->peer.revents = 0;
                     }
                     
                     //if POLLNVAL don't reschedule the socket is not valid!
