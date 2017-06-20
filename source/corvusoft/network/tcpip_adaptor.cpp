@@ -177,13 +177,11 @@ namespace corvusoft
             
             const unsigned short port = options->get( "port", 0 );
             const unsigned int backlog = options->get( "backlog", SOMAXCONN );
-            //socket timeout.
             
             ///m_pimpl->message_handler = accept_handler;
             const auto message_handler = m_pimpl->original_message_handler;
             m_pimpl->message_handler = [ this, settings, message_handler ]
             {
-                fprintf( stderr, "accept handler called\n" );
                 static socklen_t length = sizeof( struct sockaddr_in );
                 struct sockaddr_in endpoint;
                 memset( &endpoint, 0, length );
@@ -224,8 +222,6 @@ namespace corvusoft
                 {
                     fprintf( stderr, "[child] close handler called.\n" );
                 };
-                
-                fprintf( stderr, "CHILD WITH FD %d\n", adaptor->m_pimpl->peer.fd );
                 
                 m_pimpl->runloop->launch( bind( TCPIPAdaptorImpl::event_monitor, adaptor->m_pimpl ), m_pimpl->key );
             };
@@ -270,7 +266,7 @@ namespace corvusoft
                 m_pimpl->open_handler( );
                 return error_code( );
             } ); //remove wrapper? static
-            fprintf( stderr, "LISTEN WITH FD %d\n", m_pimpl->peer.fd );
+            
             return error_code( ); //send back a message "Adaptor awaiting connections at...";
         }
         

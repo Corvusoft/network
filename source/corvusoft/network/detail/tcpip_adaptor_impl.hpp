@@ -77,6 +77,8 @@ namespace corvusoft
                     static const int TIMEOUT = 1000;
                     static const int SINGLE_FILE_DESCRIPTOR = 1;
                     
+                    //this is wrong! we launch the event monitor which blocks teh runloop.
+                    //nonblocking check a group of peers and then schedule ourselves for a later date.
                     const int status = poll( &( adaptor->peer ), SINGLE_FILE_DESCRIPTOR, TIMEOUT );
                     if ( adaptor->is_closed ) return std::error_code( );
                     if ( status == -1 and errno not_eq EINPROGRESS ) adaptor->error( errno );
