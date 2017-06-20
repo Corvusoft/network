@@ -1,6 +1,6 @@
 find_library( runloop_STATIC_LIBRARY librunloop.a HINTS "${CMAKE_SOURCE_DIR}/dependency/runloop/distribution/library" )
 find_library( runloop_SHARED_LIBRARY NAMES librunloop.so librunloop.dylib HINTS "${CMAKE_SOURCE_DIR}/dependency/runloop/distribution/library" )
-find_path( runloop_INCLUDE "corvusoft/core/run_loop.hpp"  HINTS "${CMAKE_SOURCE_DIR}/dependency/runloop/distribution/include" )
+find_path( runloop_INCLUDE "corvusoft/core/run_loop.hpp" HINTS "${CMAKE_SOURCE_DIR}/dependency/runloop/distribution/include" )
 
 if ( runloop_INCLUDE AND runloop_STATIC_LIBRARY AND runloop_SHARED_LIBRARY )
     set( RUNLOOP_FOUND TRUE )
