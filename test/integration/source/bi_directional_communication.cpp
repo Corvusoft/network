@@ -38,7 +38,11 @@ TEST_CASE( "Bi-directional communiction." )
     {
         fprintf( stderr, "Client open handler called.\n" );
         error_code status;
-        const auto size = client->produce( make_bytes( "Hello, Server!" ), status );
+        auto size = client->produce( make_bytes( "Hello, Server!" ), status );
+        REQUIRE( size == 14 );
+        REQUIRE( status == error_code( ) );
+        
+        size = client->flush( size, status );
         REQUIRE( size == 14 );
         REQUIRE( status == error_code( ) );
     } );
@@ -79,7 +83,11 @@ TEST_CASE( "Bi-directional communiction." )
         REQUIRE( status == error_code( ) );
         REQUIRE( data == make_bytes( "Hello, Server!" ) );
         
-        const auto size = server->produce( make_bytes( "Hello, Client!" ), status );
+        auto size = server->produce( make_bytes( "Hello, Client!" ), status );
+        REQUIRE( size == 14 );
+        REQUIRE( status == error_code( ) );
+        
+        size = server->flush( size, status );
         REQUIRE( size == 14 );
         REQUIRE( status == error_code( ) );
         

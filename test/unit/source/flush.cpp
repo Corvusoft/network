@@ -1,4 +1,5 @@
 //System Includes
+#include <string>
 #include <memory>
 #include <system_error>
 
@@ -7,10 +8,9 @@
 
 //External Includes
 #include <catch.hpp>
-#include <corvusoft/core/byte.hpp>
-#include <corvusoft/core/settings.hpp>
 
 //System Namespaces
+using std::string;
 using std::error_code;
 using std::shared_ptr;
 
@@ -18,19 +18,17 @@ using std::shared_ptr;
 using corvusoft::network::TCPIPAdaptor;
 
 //External Namespaces
-using corvusoft::core::Bytes;
-using corvusoft::core::Settings;
 
-TEST_CASE( "Peek" )
+TEST_CASE( "Flush" )
 {
-    Bytes data { };
+    size_t size = 0;
     error_code status;
     auto adaptor = TCPIPAdaptor::create( );
-    REQUIRE_NOTHROW( { data = adaptor->peek( status ); } );
-    REQUIRE( data.empty( ) == true );
+    REQUIRE_NOTHROW( { size = adaptor->flush( 0, status ); } );
+    REQUIRE( size == 0 );
     REQUIRE( status == std::errc::bad_file_descriptor );
     
-    REQUIRE_NOTHROW( { data = adaptor->peek( status ); } );
-    REQUIRE( data.empty( ) == true );
+    REQUIRE_NOTHROW( { size = adaptor->flush( 99999, status ); } );
+    REQUIRE( size == 0 );
     REQUIRE( status == std::errc::bad_file_descriptor );
 }

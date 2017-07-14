@@ -270,7 +270,7 @@ namespace corvusoft
             return error_code( ); //send back a message "Adaptor awaiting connections at...";
         }
         
-        const Bytes TCPIPAdaptor::peek( error_code& error )
+        const Bytes TCPIPAdaptor::consume( error_code& error )
         {
             auto& buffer = m_pimpl->buffer;
             static const size_t length = 1024;
@@ -309,22 +309,32 @@ namespace corvusoft
             return buffer;
         }
         
-        const Bytes TCPIPAdaptor::consume( error_code& error )
+        size_t TCPIPAdaptor::purge( const size_t length, error_code& )
         {
-            const auto data = peek( error );
-            m_pimpl->buffer.clear( );
-            return data;
+            auto& data = m_pimpl->buffer;
+            const size_t size = ( length > data.size( ) ) ? data.size( ) : length;
+            data.erase( data.begin( ), data.begin( ) + size );
+            
+            return size;
         }
         
-        size_t TCPIPAdaptor::produce( const Bytes& data, error_code& error )
+        size_t TCPIPAdaptor::produce( const Bytes& data, error_code& )
         {
-            ssize_t size = write( m_pimpl->peer.fd, data.data( ), data.size( ) );
+            m_pimpl->buffer.insert( m_pimpl->buffer.begin( ), data.begin( ), data.end( ) );
+            return data.size( );
+        }
+        
+        size_t TCPIPAdaptor::flush( const size_t length, error_code& error )
+        {
+            auto& data = m_pimpl->buffer;
+            ssize_t size = write( m_pimpl->peer.fd, data.data( ), length );
             if ( size < 0 )
             {
-                size = 0;
                 error = m_pimpl->error( errno );
+                return 0;
             }
             
+            data.erase( data.begin( ), data.begin( ) + size );
             return size;
         }
         

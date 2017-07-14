@@ -49,20 +49,21 @@ namespace corvusoft
                 
                 virtual std::error_code setup( const std::shared_ptr< const core::Settings >& settings = nullptr ) = 0;
                 
-                virtual std::error_code setup( const std::shared_ptr< core::RunLoop >& runloop,
-                                               const std::shared_ptr< const core::Settings >& settings = nullptr ) = 0;
-                                               
+                virtual std::error_code setup( const std::shared_ptr< core::RunLoop >& runloop, const std::shared_ptr< const core::Settings >& settings = nullptr ) = 0;
+                
                 virtual std::error_code close( void ) = 0;
                 
                 virtual std::error_code open( const std::shared_ptr< const core::Settings >& settings ) = 0;
                 
                 virtual std::error_code listen( const std::shared_ptr< const core::Settings >& settings = nullptr ) = 0;
                 
-                virtual const core::Bytes peek( std::error_code& error ) = 0;
-                
                 virtual const core::Bytes consume( std::error_code& error ) = 0;
                 
+                virtual std::size_t purge( const std::size_t length, std::error_code& error ) = 0;
+                
                 virtual std::size_t produce( const core::Bytes& data, std::error_code& error ) = 0;
+                
+                virtual std::size_t flush( const std::size_t length, std::error_code& error ) = 0;
                 
                 //Getters
                 virtual std::string get_key( void ) const = 0;

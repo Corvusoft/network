@@ -8,7 +8,6 @@
 
 //External Includes
 #include <catch.hpp>
-#include <corvusoft/core/byte.hpp>
 
 //System Namespaces
 using std::string;
@@ -19,23 +18,17 @@ using std::shared_ptr;
 using corvusoft::network::TCPIPAdaptor;
 
 //External Namespaces
-using corvusoft::core::Bytes;
-using corvusoft::core::make_bytes;
 
-TEST_CASE( "Produce" )
+TEST_CASE( "Purge" )
 {
-    Bytes data { };
     size_t size = 0;
     error_code status;
     auto adaptor = TCPIPAdaptor::create( );
-    REQUIRE_NOTHROW( { size = adaptor->produce( data, status ); } );
+    REQUIRE_NOTHROW( { size = adaptor->purge( 0, status ); } );
     REQUIRE( size == 0 );
-    REQUIRE( data.empty( ) );
     REQUIRE( status == error_code( ) );
     
-    data = make_bytes( "test data" );
-    size = adaptor->produce( data, status );
-    REQUIRE( size == 9 );
-    REQUIRE( data == make_bytes( "test data" ) );
+    REQUIRE_NOTHROW( { size = adaptor->purge( 99999, status ); } );
+    REQUIRE( size == 0 );
     REQUIRE( status == error_code( ) );
 }

@@ -37,7 +37,11 @@ TEST_CASE( "Uni-directional communiction." )
     client->set_open_handler( [ ]( const shared_ptr< Adaptor > client )
     {
         error_code status;
-        const auto size = client->produce( make_bytes( "Hello, Server!" ), status );
+        auto size = client->produce( make_bytes( "Hello, Server!" ), status );
+        REQUIRE( size == 14 );
+        REQUIRE( status == error_code( ) );
+        
+        size = client->flush( size, status );
         REQUIRE( size == 14 );
         REQUIRE( status == error_code( ) );
     } );

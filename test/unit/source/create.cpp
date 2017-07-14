@@ -10,7 +10,6 @@
 #include <catch.hpp>
 #include <corvusoft/core/byte.hpp>
 #include <corvusoft/core/run_loop.hpp>
-#include <corvusoft/core/settings.hpp>
 
 //System Namespaces
 using std::string;

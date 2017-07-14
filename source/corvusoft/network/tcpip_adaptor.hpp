@@ -66,11 +66,13 @@ namespace corvusoft
                 
                 virtual std::error_code listen( const std::shared_ptr< const core::Settings >& settings ) override;
                 
-                virtual const core::Bytes peek( std::error_code& error ) override;
-                
                 virtual const core::Bytes consume( std::error_code& error ) override;
                 
+                virtual std::size_t purge( const std::size_t length, std::error_code& error ) override;
+                
                 virtual std::size_t produce( const core::Bytes& data, std::error_code& error ) override;
+                
+                virtual std::size_t flush( const std::size_t length, std::error_code& error ) override;
                 
                 //Getters
                 virtual std::string get_key( void ) const override;
