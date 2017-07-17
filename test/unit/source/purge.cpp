@@ -24,11 +24,11 @@ TEST_CASE( "Purge" )
     size_t size = 0;
     error_code status;
     auto adaptor = TCPIPAdaptor::create( );
-    REQUIRE_NOTHROW( { size = adaptor->purge( 0, status ); } );
+    size = adaptor->purge( 0, status );
     REQUIRE( size == 0 );
     REQUIRE( status == error_code( ) );
     
-    REQUIRE_NOTHROW( { size = adaptor->purge( 99999, status ); } );
+    size = adaptor->purge( 99999, status );
     REQUIRE( size == 0 );
     REQUIRE( status == error_code( ) );
 }

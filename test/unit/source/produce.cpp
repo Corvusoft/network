@@ -28,7 +28,7 @@ TEST_CASE( "Produce" )
     size_t size = 0;
     error_code status;
     auto adaptor = TCPIPAdaptor::create( );
-    REQUIRE_NOTHROW( { size = adaptor->produce( data, status ); } );
+    size = adaptor->produce( data, status );
     REQUIRE( size == 0 );
     REQUIRE( data.empty( ) );
     REQUIRE( status == error_code( ) );

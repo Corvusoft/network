@@ -24,11 +24,11 @@ TEST_CASE( "Consume" )
     Bytes data { };
     error_code status;
     auto adaptor = TCPIPAdaptor::create( );
-    REQUIRE_NOTHROW( { data = adaptor->consume( status ); } );
+    data = adaptor->consume( status );
     REQUIRE( data.empty( ) == true );
     REQUIRE( status == std::errc::bad_file_descriptor );
     
-    REQUIRE_NOTHROW( { data = adaptor->consume( status ); } );
+    data = adaptor->consume( status );
     REQUIRE( data.empty( ) == true );
     REQUIRE( status == std::errc::bad_file_descriptor );
 }

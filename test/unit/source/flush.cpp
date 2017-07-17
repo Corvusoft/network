@@ -24,11 +24,11 @@ TEST_CASE( "Flush" )
     size_t size = 0;
     error_code status;
     auto adaptor = TCPIPAdaptor::create( );
-    REQUIRE_NOTHROW( { size = adaptor->flush( 0, status ); } );
+    size = adaptor->flush( 0, status );
     REQUIRE( size == 0 );
     REQUIRE( status == std::errc::bad_file_descriptor );
     
-    REQUIRE_NOTHROW( { size = adaptor->flush( 99999, status ); } );
+    size = adaptor->flush( 99999, status );
     REQUIRE( size == 0 );
     REQUIRE( status == std::errc::bad_file_descriptor );
 }
