@@ -75,7 +75,7 @@ namespace corvusoft
                 virtual std::size_t flush( const std::size_t length, std::error_code& error ) override;
                 
                 //Getters
-                virtual std::string get_key( void ) const override;
+                virtual std::string get_name( void ) const override;
                 
                 virtual std::string get_local_endpoint( void ) override;
                 

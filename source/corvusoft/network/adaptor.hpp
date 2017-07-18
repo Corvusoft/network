@@ -66,7 +66,7 @@ namespace corvusoft
                 virtual std::size_t flush( const std::size_t length, std::error_code& error ) = 0;
                 
                 //Getters
-                virtual std::string get_key( void ) const = 0;
+                virtual std::string get_name( void ) const = 0;
                 
                 virtual std::string get_local_endpoint( void ) = 0;
                 

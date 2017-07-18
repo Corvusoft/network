@@ -51,9 +51,9 @@ namespace corvusoft
 {
     namespace network
     {
-        shared_ptr< Adaptor > TCPIPAdaptor::create( const string& key )
+        shared_ptr< Adaptor > TCPIPAdaptor::create( const string& name )
         {
-            return shared_ptr< TCPIPAdaptor >( new TCPIPAdaptor( key ) );
+            return shared_ptr< TCPIPAdaptor >( new TCPIPAdaptor( name ) );
         }
         
         TCPIPAdaptor::~TCPIPAdaptor( void )
@@ -95,7 +95,7 @@ namespace corvusoft
             
             if ( m_pimpl->runloop not_eq nullptr )
             {
-                m_pimpl->runloop->cancel( m_pimpl->key );
+                m_pimpl->runloop->cancel( m_pimpl->name );
                 
                 if ( m_pimpl->close_handler not_eq nullptr )
                     m_pimpl->runloop->launch( [ this ]( )
@@ -158,7 +158,7 @@ namespace corvusoft
             m_pimpl->buffer = make_bytes( );
             m_pimpl->peer = peer;
             m_pimpl->endpoint = endpoint;
-            m_pimpl->runloop->launch( bind( TCPIPAdaptorImpl::event_monitor, m_pimpl ), m_pimpl->key );
+            m_pimpl->runloop->launch( bind( TCPIPAdaptorImpl::event_monitor, m_pimpl ), m_pimpl->name );
             
             return error_code( );
         }
@@ -223,7 +223,7 @@ namespace corvusoft
                     fprintf( stderr, "[child] close handler called.\n" );
                 };
                 
-                m_pimpl->runloop->launch( bind( TCPIPAdaptorImpl::event_monitor, adaptor->m_pimpl ), m_pimpl->key );
+                m_pimpl->runloop->launch( bind( TCPIPAdaptorImpl::event_monitor, adaptor->m_pimpl ), m_pimpl->name );
             };
             
             m_pimpl->peer.revents = 0;
@@ -256,7 +256,7 @@ namespace corvusoft
             if ( status == -1 ) return m_pimpl->error( errno );
             
             m_pimpl->endpoint = endpoint;
-            m_pimpl->runloop->launch( bind( TCPIPAdaptorImpl::event_monitor, m_pimpl ), m_pimpl->key );
+            m_pimpl->runloop->launch( bind( TCPIPAdaptorImpl::event_monitor, m_pimpl ), m_pimpl->name );
             
             m_pimpl->is_in_use = true;
             
@@ -338,9 +338,9 @@ namespace corvusoft
             return size;
         }
         
-        string TCPIPAdaptor::get_key( void ) const
+        string TCPIPAdaptor::get_name( void ) const
         {
-            return m_pimpl->key;
+            return m_pimpl->name;
         }
         
         string TCPIPAdaptor::get_local_endpoint( void )
@@ -399,10 +399,10 @@ namespace corvusoft
             else m_pimpl->original_message_handler = value;
         }
         
-        TCPIPAdaptor::TCPIPAdaptor( const string& key ) : Adaptor( key ),
+        TCPIPAdaptor::TCPIPAdaptor( const string& name ) : Adaptor( name ),
             m_pimpl( new TCPIPAdaptorImpl )
         {
-            m_pimpl->key = key;
+            m_pimpl->name = name;
         }
     }
 }
