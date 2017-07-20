@@ -22,13 +22,22 @@ using corvusoft::network::TCPIPAdaptor;
 //External Namespaces
 using corvusoft::core::Bytes;
 
+bool is_default_address( const string& address )
+{
+    return address == "0.0.0.0:0" or address == "[::1]:0" or address == "127.0.0.1:0";
+}
+
 TEST_CASE( "Create" )
 {
     REQUIRE_NOTHROW( TCPIPAdaptor::create( ) );
     
     auto adaptor = TCPIPAdaptor::create( );
     REQUIRE( adaptor->get_name( ) == "TCPIP" );
+    REQUIRE( is_default_address( adaptor->get_local_endpoint( ) ) );
+    REQUIRE( is_default_address( adaptor->get_remote_endpoint( ) ) );
     
     adaptor = TCPIPAdaptor::create( "Test Socket" );
     REQUIRE( adaptor->get_name( ) == "Test Socket" );
+    REQUIRE( is_default_address( adaptor->get_local_endpoint( ) ) );
+    REQUIRE( is_default_address( adaptor->get_remote_endpoint( ) ) );
 }
