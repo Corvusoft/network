@@ -38,7 +38,7 @@ namespace corvusoft
             
             struct TCPIPAdaptorImpl
             {
-                std::string key = "";
+                std::string name = "";
                 
                 core::Bytes buffer { };
                 
@@ -106,7 +106,7 @@ namespace corvusoft
                     
                     //if POLLNVAL don't reschedule the socket is not valid!
                     //EAGAIN, its a core task!
-                    adaptor->runloop->launch( bind( TCPIPAdaptorImpl::event_monitor, adaptor ), adaptor->key );
+                    adaptor->runloop->launch( bind( TCPIPAdaptorImpl::event_monitor, adaptor ), adaptor->name );
                     return std::error_code( );
                 }
             };
