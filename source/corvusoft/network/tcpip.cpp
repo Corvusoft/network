@@ -53,6 +53,7 @@ namespace corvusoft
         TCPIP::TCPIP( const shared_ptr< RunLoop >& runloop ) : Adaptor( ),
             m_pimpl( new TCPIPImpl )
         {
+            //assert( runloop == nullptr, "error message");
             m_pimpl->runloop = runloop;
         }
         
