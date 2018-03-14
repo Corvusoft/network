@@ -84,16 +84,12 @@ TEST_CASE( "Client implementation." )
     status = adaptor->teardown( );
     REQUIRE( status == error_code( ) );
     
-    status = runloop->start( );
-    REQUIRE( status == error_code( ) );
+    runloop->start( );
+    runloop->wait( );
+    runloop->stop( );
     
-    status = runloop->wait( );
-    REQUIRE( status == error_code( ) );
-    
-    std::this_thread::sleep_for( std::chrono::seconds( 5 ) ); //force wait to hang until all tasks completed.
-    
-    status = runloop->stop( );
-    REQUIRE( status == error_code( ) );
+    //std::this_thread::sleep_for( std::chrono::seconds( 5 ) ); //force wait to hang until all tasks completed.
+    //runloop->stop( );
     
     REQUIRE( open_called == true );
     REQUIRE( produce_called == true );
