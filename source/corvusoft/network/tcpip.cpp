@@ -74,6 +74,8 @@ namespace corvusoft
         
         void TCPIP::open( const shared_ptr< const Settings >& settings, const function< error_code ( const shared_ptr< Adaptor >, const error_code ) > completion_handler )
         {
+            if ( completion_handler == nullptr ) return;
+            
             if ( settings == nullptr ) completion_handler( shared_from_this( ), make_error_code( std::errc::invalid_argument ) );
             if ( not settings->has( "port" ) ) completion_handler( shared_from_this( ), make_error_code( std::errc::invalid_argument ) );
             if ( not settings->has( "address" ) ) completion_handler( shared_from_this( ), make_error_code( std::errc::invalid_argument ) );
@@ -112,6 +114,8 @@ namespace corvusoft
         
         void TCPIP::close( const function< error_code ( const shared_ptr< Adaptor >, const error_code ) > completion_handler )
         {
+            if ( completion_handler == nullptr ) return;
+            
             m_pimpl->runloop->cancel( detail::RUNLOOP_KEY );
             m_pimpl->runloop->launch( bind( m_pimpl->socket_task, shared_from_this( ), POLLHUP, completion_handler ), detail::RUNLOOP_KEY );
             
@@ -124,12 +128,16 @@ namespace corvusoft
         
         void TCPIP::consume( const function< error_code ( const shared_ptr< Adaptor >, const Bytes, const error_code ) > completion_handler )
         {
+            if ( completion_handler == nullptr ) return;
+            
             const function< error_code ( const shared_ptr< Adaptor >, const error_code ) > consumption_handler = bind( m_pimpl->consume, _1, _2, completion_handler );
             m_pimpl->runloop->launch( bind( m_pimpl->socket_task, shared_from_this( ), POLLIN | POLLPRI, consumption_handler ), detail::RUNLOOP_KEY );
         }
         
         void TCPIP::produce( const Bytes& data, const function< error_code ( const shared_ptr< Adaptor >, const size_t, const error_code ) > completion_handler )
         {
+            if ( completion_handler == nullptr ) return;
+            
             m_pimpl->runloop->launch( bind( m_pimpl->produce, shared_from_this( ), data, completion_handler ), detail::RUNLOOP_KEY );
         }
         
@@ -139,6 +147,8 @@ namespace corvusoft
          */
         void TCPIP::listen( const shared_ptr< const Settings >& settings, const function< error_code ( const shared_ptr< Adaptor >, const error_code ) > accept_handler )
         {
+            if ( accept_handler == nullptr ) return;
+            
             // if ( m_pimpl->is_in_use ) return make_error_code( std::errc::already_connected );
             // if ( m_pimpl->runloop == nullptr ) m_pimpl->runloop = make_shared< RunLoop >( );
             

@@ -59,7 +59,7 @@ namespace corvusoft
                 
                 void open( const std::shared_ptr< const core::Settings >& settings, const std::function< std::error_code ( const std::shared_ptr< Adaptor >, const std::error_code ) > completion_handler ) override;
                 
-                void close( const std::function< std::error_code ( const std::shared_ptr< Adaptor >, const std::error_code ) > completion_handler = nullptr ) override;
+                void close( const std::function< std::error_code ( const std::shared_ptr< Adaptor >, const std::error_code ) > completion_handler ) override;
                 
                 void consume( const std::function< std::error_code ( const std::shared_ptr< Adaptor >, const core::Bytes, const std::error_code ) > completion_handler ) override;
                 

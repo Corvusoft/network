@@ -51,7 +51,7 @@ namespace corvusoft
                 
                 virtual void open( const std::shared_ptr< const core::Settings >& settings, const std::function< std::error_code ( const std::shared_ptr< Adaptor >, const std::error_code ) > completion_handler ) = 0;
                 
-                virtual void close( const std::function< std::error_code ( const std::shared_ptr< Adaptor >, const std::error_code ) > completion_handler = nullptr ) = 0;
+                virtual void close( const std::function< std::error_code ( const std::shared_ptr< Adaptor >, const std::error_code ) > completion_handler ) = 0;
                 
                 virtual void consume( const std::function< std::error_code ( const std::shared_ptr< Adaptor >, const core::Bytes, const std::error_code ) > completion_handler ) = 0;
                 
