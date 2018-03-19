@@ -30,46 +30,54 @@ using corvusoft::core::RunLoop;
 using corvusoft::core::Settings;
 using corvusoft::core::make_bytes;
 
-#include <thread> //remove me.
+bool open_called = false;
+bool close_called = false;
+bool produce_called = false;
+bool consume_called = false;
 
 TEST_CASE( "Client implementation." )
 {
     auto runloop = make_shared< RunLoop >( );
     auto adaptor = make_shared< TCPIP >( runloop );
-    
-    auto status = adaptor->setup( );
-    REQUIRE( status == error_code( ) );
-    
     auto settings = make_shared< Settings >( );
     settings->set( "port", 80 );
     settings->set( "address", "216.58.203.99" );
     
-    bool open_called = false;
-    bool produce_called = false;
-    bool consume_called = false;
+    auto status = adaptor->setup( );
+    REQUIRE( status == error_code( ) );
     
-    adaptor->open( settings, [ &open_called, &produce_called, &consume_called ] ( const shared_ptr< Adaptor > adaptor, const error_code status )
+    adaptor->open( settings, [ ]( const shared_ptr< Adaptor > adaptor, const error_code status )
     {
+        open_called = true;
         REQUIRE( adaptor not_eq nullptr );
         REQUIRE( status == error_code( ) );
         
-        open_called = true;
         const auto buffer = make_bytes( "GET / HTTP/1.1\r\nHost: www.google.com.au\r\nConnection: close\r\n\r\n" );
-        adaptor->produce( buffer, [ buffer, &produce_called, &consume_called ]( const shared_ptr< Adaptor > adaptor, const size_t length, const error_code status )
+        adaptor->produce( buffer, [ buffer ]( const shared_ptr< Adaptor > adaptor, const size_t length, const error_code status )
         {
+            produce_called = true;
             REQUIRE( adaptor not_eq nullptr );
             REQUIRE( status == error_code( ) );
             REQUIRE( length == buffer.size( ) );
             
-            produce_called = true;
-            adaptor->consume( [ &consume_called ]( const shared_ptr< Adaptor > adaptor, const Bytes data, const error_code status )
+            adaptor->consume( [ ]( const shared_ptr< Adaptor > adaptor, const Bytes data, const error_code status )
             {
+                consume_called = true;
                 REQUIRE( not data.empty( ) );
                 REQUIRE( adaptor not_eq nullptr );
                 REQUIRE( status == error_code( ) );
                 
-                consume_called = true;
-                fprintf( stderr, "====== Data ======\n%.*s", data.size( ), data.data( ) );
+                adaptor->close( [ ]( const shared_ptr< Adaptor > adaptor, const error_code status )
+                {
+                    close_called = true;
+                    REQUIRE( adaptor not_eq nullptr );
+                    REQUIRE( status == error_code( ) );
+                    
+                    auto result = adaptor->teardown( );
+                    REQUIRE( result == error_code( ) );
+                    return result;
+                } );
+                
                 return error_code( );
             } );
             
@@ -79,19 +87,12 @@ TEST_CASE( "Client implementation." )
         return error_code( );
     } );
     
-    //adaptor->close( ); //add completion handler.
-    
-    status = adaptor->teardown( );
-    REQUIRE( status == error_code( ) );
-    
     runloop->start( );
     runloop->wait( );
     runloop->stop( );
     
-    //std::this_thread::sleep_for( std::chrono::seconds( 5 ) ); //force wait to hang until all tasks completed.
-    //runloop->stop( );
-    
     REQUIRE( open_called == true );
+    REQUIRE( close_called == true );
     REQUIRE( produce_called == true );
     REQUIRE( consume_called == true );
 }

@@ -3,26 +3,33 @@
 #include <system_error>
 
 //Project Includes
-#include "corvusoft/network/tcpip_adaptor.hpp"
+#include "corvusoft/network/tcpip.hpp"
 
 //External Includes
 #include <catch.hpp>
+#include <corvusoft/mock/run_loop.hpp>
 
 //System Namespaces
 using std::error_code;
-using std::shared_ptr;
+using std::make_shared;
 
 //Project Namespaces
-using corvusoft::network::TCPIPAdaptor;
+using corvusoft::network::TCPIP;
 
 //External Namespaces
+using corvusoft::mock::RunLoop;
 
-TEST_CASE( "Close" )
+TEST_CASE( "Close inactive adaptor." )
 {
-    auto adaptor = TCPIPAdaptor::create( );
-    auto status = adaptor->close( );
-    REQUIRE( status == std::errc::bad_file_descriptor );
+    auto runloop = make_shared< RunLoop >( );
+    auto adaptor = make_shared< TCPIP >( runloop );
+    REQUIRE_NOTHROW( adaptor->close( nullptr ) );
     
-    status = adaptor->close( );
-    REQUIRE( status == std::errc::bad_file_descriptor  );
+    bool close_called = false;
+    adaptor->close( [ &close_called ]( auto, auto )
+    {
+        close_called = true;
+        return error_code( );
+    } );
+    REQUIRE( close_called == true );
 }

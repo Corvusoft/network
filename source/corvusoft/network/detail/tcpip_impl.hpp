@@ -59,6 +59,7 @@ namespace corvusoft
                     if ( status == -1 and errno not_eq EINPROGRESS )
                         return completion_handler( adaptor, std::error_code( errno, std::system_category( ) ) );
                     else if ( status == 1 )
+                    {
                         if ( peer.revents & POLLHUP )
                             return completion_handler( adaptor, std::make_error_code( std::errc::connection_reset ) );
                         else if ( peer.revents & POLLERR or peer.revents & POLLNVAL )
@@ -68,10 +69,11 @@ namespace corvusoft
                             ::getsockopt( socket, SOL_SOCKET, SO_ERROR, ( void* ) &error, &length );
                             return completion_handler( adaptor, std::error_code( error, std::system_category( ) ) );
                         }
-                        else if ( peer.revents & events ) return completion_handler( adaptor, std::error_code( ) );
-                        
-                    runloop->launch( std::bind( socket_task, adaptor, POLLOUT, completion_handler ), RUNLOOP_KEY );
-                    return std::error_code( );
+                        else if ( peer.revents & events )
+                            return completion_handler( adaptor, std::error_code( ) );
+                    }
+                    
+                    return std::make_error_code( std::errc::resource_unavailable_try_again );
                 };
                 
                 const std::function< std::error_code ( const std::shared_ptr< Adaptor >, const std::error_code, const std::function< std::error_code ( const std::shared_ptr< Adaptor >, const core::Bytes, const std::error_code ) > ) > consume = [ this ]( auto adaptor, auto status, auto completion_handler )
@@ -87,14 +89,8 @@ namespace corvusoft
                     ssize_t size = ::recv( socket, data, length, FLAGS );
                     if ( size == -1 and errno not_eq EAGAIN )
                         return completion_handler( adaptor, buffer, std::error_code( errno, std::system_category( ) ) );
-                        
                     if ( size == -1 and errno == EAGAIN )
-                    {
-                        const std::function< std::error_code ( const std::shared_ptr< Adaptor >, const std::error_code ) > consumption_handler = std::bind( consume, std::placeholders::_1, std::placeholders::_2, completion_handler );
-                        runloop->launch( std::bind( socket_task, adaptor, POLLIN | POLLPRI, consumption_handler ), detail::RUNLOOP_KEY );
-                        return std::error_code( );//return eagain and have the runloop rescheulde us; that removes the 2 lines above!
-                    }
-                    
+                        return std::make_error_code( std::errc::resource_unavailable_try_again );
                     if ( size == 0 )
                         return completion_handler( adaptor, buffer, std::make_error_code( std::errc::connection_reset ) );
                         
@@ -108,13 +104,9 @@ namespace corvusoft
                     ssize_t size = ::send( socket, data.data( ), data.size( ), FLAGS );
                     if ( size == -1 and errno not_eq EAGAIN )
                         return completion_handler( adaptor, 0, std::error_code( errno, std::system_category( ) ) );
-                        
                     if ( size == -1 and errno == EAGAIN )
-                    {
-                        runloop->launch( std::bind( produce, adaptor, data, completion_handler ), detail::RUNLOOP_KEY );
-                        return std::error_code( ); //return eagain and have the runloop rescheulde us; that removes the 1 line above!
-                    }
-                    
+                        return std::make_error_code( std::errc::resource_unavailable_try_again );
+                        
                     return completion_handler( adaptor, size, std::error_code( ) );
                 };
             };

@@ -27,7 +27,6 @@ namespace corvusoft
     //Forward Declarations
     namespace core
     {
-        class RunLoop;
         class Settings;
     }
     
@@ -55,13 +54,9 @@ namespace corvusoft
                 
                 virtual void consume( const std::function< std::error_code ( const std::shared_ptr< Adaptor >, const core::Bytes, const std::error_code ) > completion_handler ) = 0;
                 
-                //Dont use the socket as a buffer!
-                //virtual std::error_code purge( const std::function< std::error_code ( const std::shared_ptr< Adaptor >, const core::Bytes, const std::error_code ) > completion_handler ) = 0;
-                
                 virtual void produce( const core::Bytes& data, const std::function< std::error_code ( const std::shared_ptr< Adaptor >, const std::size_t, const std::error_code ) > completion_handler ) = 0;
                 
-                virtual void listen( const std::shared_ptr< const core::Settings >& settings, const std::function< std::error_code ( const std::shared_ptr< Adaptor >, const std::error_code ) > completion_handler ) = 0;
-                //virtual std::size_t flush( const std::size_t length, std::error_code& error ) = 0;
+                virtual void listen( const std::shared_ptr< const core::Settings >& settings, const std::function< std::error_code ( const std::shared_ptr< Adaptor >, const std::error_code ) > connection_handler ) = 0;
                 
                 //Getters
                 virtual std::string get_local_endpoint( void ) = 0;

@@ -53,7 +53,6 @@ namespace corvusoft
         TCPIP::TCPIP( const shared_ptr< RunLoop >& runloop ) : Adaptor( ),
             m_pimpl( new TCPIPImpl )
         {
-            //assert( runloop == nullptr, "error message");
             m_pimpl->runloop = runloop;
         }
         
@@ -62,7 +61,7 @@ namespace corvusoft
             return;
         }
         
-        error_code TCPIP::setup( const shared_ptr< const Settings >& settings )
+        error_code TCPIP::setup( const shared_ptr< const Settings >& )
         {
             return error_code( );
         }
@@ -76,9 +75,11 @@ namespace corvusoft
         {
             if ( completion_handler == nullptr ) return;
             
-            if ( settings == nullptr ) completion_handler( shared_from_this( ), make_error_code( std::errc::invalid_argument ) );
-            if ( not settings->has( "port" ) ) completion_handler( shared_from_this( ), make_error_code( std::errc::invalid_argument ) );
-            if ( not settings->has( "address" ) ) completion_handler( shared_from_this( ), make_error_code( std::errc::invalid_argument ) );
+            if ( settings == nullptr or settings->has( "port" ) == false or settings->has( "address" ) == false )
+            {
+                completion_handler( shared_from_this( ), make_error_code( std::errc::invalid_argument ) );
+                return;
+            }
             
             m_pimpl->socket = socket( PF_INET, SOCK_STREAM, IPPROTO_TCP );
             if ( m_pimpl->socket < 0 )
@@ -99,11 +100,14 @@ namespace corvusoft
             if ( status == 0 )
                 completion_handler( shared_from_this( ), error_code( errno, system_category( ) ) );
                 
-            //if settings->get( "timeout", 30 );
+            int value = settings->get( "timeout", 30 );
+            struct timeval timeout { };
+            timeout.tv_sec = value;
+            timeout.tv_usec = 0;
+            setsockopt( m_pimpl->socket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof( timeout ) );
             
-            //if settings->get( "keep-alive", true );
-            int val = 1;
-            setsockopt( m_pimpl->socket, SOL_SOCKET, SO_KEEPALIVE, &val, sizeof val );
+            value = 1;
+            setsockopt( m_pimpl->socket, SOL_SOCKET, SO_KEEPALIVE, &value, sizeof( value ) );
             
             status = connect( m_pimpl->socket, reinterpret_cast< struct sockaddr* >( &( m_pimpl->endpoint ) ), length );
             if ( status == -1 and errno not_eq EINPROGRESS )
@@ -123,6 +127,9 @@ namespace corvusoft
             if ( status == -1 )
                 completion_handler( shared_from_this( ), error_code( errno, system_category( ) ) );
                 
+            m_pimpl->socket = -1;
+            m_pimpl->endpoint = { };
+            
             completion_handler( shared_from_this( ), error_code( ) );
         }
         
@@ -145,9 +152,9 @@ namespace corvusoft
          * note in documentation, setting a port, etc.. to a negative value will be converted signed int.
          * backlog is limited to 128
          */
-        void TCPIP::listen( const shared_ptr< const Settings >& settings, const function< error_code ( const shared_ptr< Adaptor >, const error_code ) > accept_handler )
+        void TCPIP::listen( const shared_ptr< const Settings >&, const function< error_code ( const shared_ptr< Adaptor >, const error_code ) > connection_handler )
         {
-            if ( accept_handler == nullptr ) return;
+            if ( connection_handler == nullptr ) return;
             
             // if ( m_pimpl->is_in_use ) return make_error_code( std::errc::already_connected );
             // if ( m_pimpl->runloop == nullptr ) m_pimpl->runloop = make_shared< RunLoop >( );
@@ -250,6 +257,8 @@ namespace corvusoft
         
         string TCPIP::get_local_endpoint( void )
         {
+            if ( m_pimpl->socket == -1 ) return "";
+            
             const uint16_t port = ntohs( m_pimpl->endpoint.sin_port );
             const string address = inet_ntoa( m_pimpl->endpoint.sin_addr );
             //if version 6 and brackets [::1]:80
@@ -258,6 +267,8 @@ namespace corvusoft
         
         string TCPIP::get_remote_endpoint( void )
         {
+            if ( m_pimpl->socket == -1 ) return "";
+            
             struct sockaddr_in endpoint;
             socklen_t size = sizeof( endpoint );
             

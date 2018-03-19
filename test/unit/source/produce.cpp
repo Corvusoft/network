@@ -1,41 +1,26 @@
-//System Includes
-#include <string>
+//S//System Includes
 #include <memory>
-#include <system_error>
 
 //Project Includes
-#include "corvusoft/network/tcpip_adaptor.hpp"
+#include "corvusoft/network/tcpip.hpp"
 
 //External Includes
 #include <catch.hpp>
 #include <corvusoft/core/byte.hpp>
+#include <corvusoft/mock/run_loop.hpp>
 
 //System Namespaces
-using std::string;
-using std::error_code;
-using std::shared_ptr;
+using std::make_shared;
 
 //Project Namespaces
-using corvusoft::network::TCPIPAdaptor;
+using corvusoft::network::TCPIP;
 
 //External Namespaces
-using corvusoft::core::Bytes;
-using corvusoft::core::make_bytes;
+using corvusoft::mock::RunLoop;
 
-TEST_CASE( "Produce" )
+TEST_CASE( "Produce on an inactive adaptor." )
 {
-    Bytes data { };
-    size_t size = 0;
-    error_code status;
-    auto adaptor = TCPIPAdaptor::create( );
-    size = adaptor->produce( data, status );
-    REQUIRE( size == 0 );
-    REQUIRE( data.empty( ) );
-    REQUIRE( status == error_code( ) );
-    
-    data = make_bytes( "test data" );
-    size = adaptor->produce( data, status );
-    REQUIRE( size == 9 );
-    REQUIRE( data == make_bytes( "test data" ) );
-    REQUIRE( status == error_code( ) );
+    auto runloop = make_shared< RunLoop >( );
+    auto adaptor = make_shared< TCPIP >( runloop );
+    REQUIRE_NOTHROW( adaptor->produce( { }, nullptr ) );
 }
