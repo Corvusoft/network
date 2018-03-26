@@ -67,8 +67,6 @@ TEST_CASE( "Client implementation." )
                 REQUIRE( adaptor not_eq nullptr );
                 REQUIRE( status == error_code( ) );
                 
-                fprintf( stderr, "Data: %.*s\n", data.size( ), data.data( ) );
-                
                 adaptor->close( [ ]( const shared_ptr< Adaptor > adaptor, const error_code status )
                 {
                     close_called = true;
