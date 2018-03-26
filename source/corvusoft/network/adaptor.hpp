@@ -59,9 +59,6 @@ namespace corvusoft
                 virtual void listen( const std::shared_ptr< const core::Settings >& settings, const std::function< std::error_code ( const std::shared_ptr< Adaptor >, const std::error_code ) > connection_handler ) = 0;
                 
                 //Getters
-                virtual std::string get_local_endpoint( void ) = 0;
-                
-                virtual std::string get_remote_endpoint( void ) = 0;
                 
                 //Setters
                 

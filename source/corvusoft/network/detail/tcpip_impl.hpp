@@ -9,9 +9,16 @@
 #include <poll.h>
 #include <string>
 #include <memory>
+#include <cstring>
+#include <netdb.h>
+#include <fcntl.h>
+#include <unistd.h>
 #include <functional>
+#include <arpa/inet.h>
 #include <sys/types.h>
+#include <sys/socket.h>
 #include <system_error>
+#include <netinet/tcp.h>
 
 //Project Includes
 
@@ -42,9 +49,55 @@ namespace corvusoft
             {
                 int socket = -1;
                 
-                struct sockaddr_in endpoint { };
+                int socket_timeout = 0;
+                
+                struct addrinfo hints { };
+                
+                struct addrinfo* info = nullptr;
                 
                 std::shared_ptr< core::RunLoop > runloop = nullptr;
+                
+                void open( const std::shared_ptr< Adaptor > adaptor, const std::function< std::error_code ( const std::shared_ptr< Adaptor >, const std::error_code ) > completion_handler )
+                {
+                    if ( info == nullptr )
+                    {
+                        freeaddrinfo( info );
+                        completion_handler( adaptor, std::error_code( errno, std::system_category( ) ) );
+                        return;
+                    }
+                    
+                    socket = ::socket( info->ai_family, info->ai_socktype, info->ai_protocol );
+                    if ( socket < 0 )
+                    {
+                        info = info->ai_next;
+                        return open( adaptor, completion_handler );
+                    }
+                    
+                    struct timeval timeout { };
+                    timeout.tv_sec = socket_timeout;
+                    timeout.tv_usec = 0;
+                    ::setsockopt( socket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof( timeout ) );
+                    
+                    int value = 1;
+                    ::setsockopt( socket, SOL_SOCKET, SO_KEEPALIVE, &value, sizeof( value ) );
+                    
+                    int status = ::fcntl( socket, F_SETFL, fcntl( socket, F_GETFL, 0 ) | O_NONBLOCK );
+                    if ( status < 0 )
+                    {
+                        completion_handler( adaptor, std::error_code( errno, std::system_category( ) ) );
+                        return;
+                    }
+                    
+                    status = ::connect( socket, info->ai_addr, info->ai_addrlen );
+                    if ( status == -1 and errno not_eq EINPROGRESS )
+                    {
+                        ::close( socket );
+                        info = info->ai_next;
+                        return open( adaptor, completion_handler );
+                    }
+                    
+                    runloop->launch( bind( socket_task, adaptor, POLLOUT, completion_handler ), detail::RUNLOOP_KEY );
+                }
                 
                 const std::function< std::error_code ( const std::shared_ptr< Adaptor >, short, const std::function< std::error_code ( const std::shared_ptr< Adaptor >, const std::error_code ) > ) > socket_task = [ this ]( auto adaptor, auto events, auto completion_handler )
                 {
@@ -56,6 +109,7 @@ namespace corvusoft
                     static const int TIMEOUT = 0;
                     static const int SINGLE_FILE_DESCRIPTOR = 1;
                     const int status = poll( &peer, SINGLE_FILE_DESCRIPTOR, TIMEOUT );
+                    
                     if ( status == -1 and errno not_eq EINPROGRESS )
                         return completion_handler( adaptor, std::error_code( errno, std::system_category( ) ) );
                     else if ( status == 1 )

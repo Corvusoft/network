@@ -41,7 +41,7 @@ TEST_CASE( "Client implementation." )
     auto adaptor = make_shared< TCPIP >( runloop );
     auto settings = make_shared< Settings >( );
     settings->set( "port", 80 );
-    settings->set( "address", "216.58.203.99" );
+    settings->set( "address", "www.google.com.au" );
     
     auto status = adaptor->setup( );
     REQUIRE( status == error_code( ) );
@@ -66,6 +66,8 @@ TEST_CASE( "Client implementation." )
                 REQUIRE( not data.empty( ) );
                 REQUIRE( adaptor not_eq nullptr );
                 REQUIRE( status == error_code( ) );
+                
+                fprintf( stderr, "Data: %.*s\n", data.size( ), data.data( ) );
                 
                 adaptor->close( [ ]( const shared_ptr< Adaptor > adaptor, const error_code status )
                 {

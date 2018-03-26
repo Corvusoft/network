@@ -3,17 +3,8 @@
  */
 
 //System Includes
-#include <poll.h>
 #include <string>
-#include <cstring>
-#include <cassert>
-#include <fcntl.h>
-#include <unistd.h>
-#include <arpa/inet.h>
-#include <sys/types.h>
-#include <sys/socket.h>
 #include <system_error>
-#include <netinet/tcp.h>
 
 //Project Includes
 #include "corvusoft/network/tcpip.hpp"
@@ -81,39 +72,20 @@ namespace corvusoft
                 return;
             }
             
-            m_pimpl->socket = socket( PF_INET, SOCK_STREAM, IPPROTO_TCP );
-            if ( m_pimpl->socket < 0 )
-                completion_handler( shared_from_this( ), error_code( errno, system_category( ) ) );
-                
-            int status = fcntl( m_pimpl->socket, F_SETFL, fcntl( m_pimpl->socket, F_GETFL, 0 ) | O_NONBLOCK );
-            if ( status < 0 )
-                completion_handler( shared_from_this( ), error_code( errno, system_category( ) ) );
-                
-            const uint16_t port = settings->get( "port", 0 );
-            const socklen_t length = sizeof( struct sockaddr_in );
-            memset( &m_pimpl->endpoint, 0, length );
-            m_pimpl->endpoint.sin_family = PF_INET;
-            m_pimpl->endpoint.sin_port = htons( port );
+            string address = settings->get( "address" );
+            string port = ::to_string( settings->get( "port", 0 ) );
+            m_pimpl->socket_timeout = settings->get( "timeout", 30 );
             
-            const string address = settings->get( "address" );
-            status = inet_pton( PF_INET, address.data( ), &( m_pimpl->endpoint.sin_addr.s_addr ) );
-            if ( status == 0 )
-                completion_handler( shared_from_this( ), error_code( errno, system_category( ) ) );
-                
-            int value = settings->get( "timeout", 30 );
-            struct timeval timeout { };
-            timeout.tv_sec = value;
-            timeout.tv_usec = 0;
-            setsockopt( m_pimpl->socket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof( timeout ) );
+            memset( &m_pimpl->hints, 0, sizeof( m_pimpl->hints ) );
+            m_pimpl->hints.ai_family = AF_UNSPEC;
+            m_pimpl->hints.ai_socktype = SOCK_STREAM;
+            m_pimpl->hints.ai_protocol = IPPROTO_TCP;
             
-            value = 1;
-            setsockopt( m_pimpl->socket, SOL_SOCKET, SO_KEEPALIVE, &value, sizeof( value ) );
-            
-            status = connect( m_pimpl->socket, reinterpret_cast< struct sockaddr* >( &( m_pimpl->endpoint ) ), length );
-            if ( status == -1 and errno not_eq EINPROGRESS )
+            int status = getaddrinfo( address.data( ), port.data( ), &m_pimpl->hints, &m_pimpl->info );
+            if ( status not_eq 0 )
                 completion_handler( shared_from_this( ), error_code( errno, system_category( ) ) );
-                
-            m_pimpl->runloop->launch( bind( m_pimpl->socket_task, shared_from_this( ), POLLOUT, completion_handler ), detail::RUNLOOP_KEY );
+            else
+                m_pimpl->open( shared_from_this( ), completion_handler );
         }
         
         void TCPIP::close( const function< error_code ( const shared_ptr< Adaptor >, const error_code ) > completion_handler )
@@ -125,10 +97,13 @@ namespace corvusoft
             
             const int status = ::close( m_pimpl->socket );
             if ( status == -1 )
+            {
                 completion_handler( shared_from_this( ), error_code( errno, system_category( ) ) );
-                
+                return;
+            }
+            
             m_pimpl->socket = -1;
-            m_pimpl->endpoint = { };
+            freeaddrinfo( m_pimpl->info );
             
             completion_handler( shared_from_this( ), error_code( ) );
         }
@@ -148,136 +123,9 @@ namespace corvusoft
             m_pimpl->runloop->launch( bind( m_pimpl->produce, shared_from_this( ), data, completion_handler ), detail::RUNLOOP_KEY );
         }
         
-        /*
-         * note in documentation, setting a port, etc.. to a negative value will be converted signed int.
-         * backlog is limited to 128
-         */
-        void TCPIP::listen( const shared_ptr< const Settings >&, const function< error_code ( const shared_ptr< Adaptor >, const error_code ) > connection_handler )
+        void TCPIP::listen( const shared_ptr< const Settings >&, const function< error_code ( const shared_ptr< Adaptor >, const error_code ) > )
         {
-            if ( connection_handler == nullptr ) return;
-            
-            // if ( m_pimpl->is_in_use ) return make_error_code( std::errc::already_connected );
-            // if ( m_pimpl->runloop == nullptr ) m_pimpl->runloop = make_shared< RunLoop >( );
-            
-            // shared_ptr< const Settings > options = settings;
-            // if ( options == nullptr ) options = make_shared< Settings >( );
-            
-            // const unsigned short port = options->get( "port", 0 );
-            // const unsigned int backlog = options->get( "backlog", SOMAXCONN );
-            
-            // ///m_pimpl->message_handler = accept_handler;
-            // const auto message_handler = m_pimpl->original_message_handler;
-            // m_pimpl->message_handler = [ this, settings, message_handler ]
-            // {
-            //     static socklen_t length = sizeof( struct sockaddr_in );
-            //     struct sockaddr_in endpoint;
-            //     memset( &endpoint, 0, length );
-            
-            //     struct pollfd peer;
-            //     peer.revents = 0;
-            //     peer.events = POLLIN | POLLPRI | POLLOUT | POLLERR | POLLHUP | POLLNVAL;
-            //     peer.fd = accept( m_pimpl->peer.fd, reinterpret_cast< struct sockaddr* >( &endpoint ), &length );
-            //     if ( peer.fd < 0 ) //test also if eagin or ewouldblock and just return, no error;
-            //     {
-            //         m_pimpl->error( errno );
-            //         return;
-            //     }
-            
-            //     const int status = fcntl( peer.fd, F_SETFL, fcntl( peer.fd, F_GETFL, 0 ) | O_NONBLOCK ); //extract inner fcntl!!!
-            //     if ( status < 0 )
-            //     {
-            //         m_pimpl->error( errno );
-            //         return;
-            //     }
-            
-            //     int val = 1;
-            //     setsockopt( peer.fd, IPPROTO_TCP, SO_KEEPALIVE, &val, sizeof val );
-            
-            //     auto adaptor = shared_ptr< TCPIP >( new TCPIP( "child" ) ); //generate random key? no use address:port
-            //     adaptor->setup( m_pimpl->runloop, settings );
-            //     adaptor->m_pimpl->peer = peer;
-            //     adaptor->m_pimpl->endpoint = endpoint;
-            //     adaptor->m_pimpl->message_handler = [ adaptor, message_handler ] //bind?
-            //     {
-            //         message_handler( adaptor );
-            //     };
-            //     adaptor->m_pimpl->error_handler = [ ]( error_code )
-            //     {
-            //         fprintf( stderr, "[child] error handler called.\n" );
-            //     };
-            //     adaptor->m_pimpl->close_handler = [ ]
-            //     {
-            //         fprintf( stderr, "[child] close handler called.\n" );
-            //     };
-            
-            //     m_pimpl->runloop->launch( bind( TCPIPImpl::event_monitor, adaptor->m_pimpl ), m_pimpl->name );
-            // };
-            
-            // m_pimpl->peer.revents = 0;
-            // m_pimpl->peer.events = POLLIN | POLLPRI | POLLOUT | POLLERR | POLLHUP | POLLNVAL;
-            // m_pimpl->peer.fd = socket( PF_INET, SOCK_STREAM, IPPROTO_TCP );
-            // if ( m_pimpl->peer.fd < 0 ) return m_pimpl->error( errno );
-            
-            // int status = fcntl( m_pimpl->peer.fd, F_SETFL, fcntl( m_pimpl->peer.fd, F_GETFL, 0 ) | O_NONBLOCK );
-            // if ( status < 0 ) return m_pimpl->error( errno );
-            
-            // int val = 1;
-            // setsockopt( m_pimpl->peer.fd, IPPROTO_TCP, SO_KEEPALIVE, &val, sizeof val );
-            
-            // status = 1;
-            // status = setsockopt( m_pimpl->peer.fd, SOL_SOCKET, SO_REUSEADDR, &status, sizeof( status ) );
-            // if ( status == -1 ) return m_pimpl->error( errno );
-            
-            // const socklen_t length = sizeof( struct sockaddr_in );
-            
-            // struct sockaddr_in endpoint;
-            // memset( &endpoint, 0, length );
-            // endpoint.sin_family = PF_INET;
-            // endpoint.sin_port = htons( port );
-            // endpoint.sin_addr.s_addr = INADDR_ANY;
-            
-            // status = bind( m_pimpl->peer.fd, reinterpret_cast< struct sockaddr* >( &endpoint ), length );
-            // if ( status == -1 ) return m_pimpl->error( errno );
-            
-            // status = ::listen( m_pimpl->peer.fd, backlog );
-            // if ( status == -1 ) return m_pimpl->error( errno );
-            
-            // m_pimpl->endpoint = endpoint;
-            // m_pimpl->runloop->launch( bind( TCPIPImpl::event_monitor, m_pimpl ), m_pimpl->name );
-            
-            // m_pimpl->is_in_use = true;
-            
-            // if ( m_pimpl->open_handler not_eq nullptr ) //why doesnt the poll tell us this?
-            //     m_pimpl->runloop->launch( [ this ]( )
-            // {
-            //     m_pimpl->open_handler( );
-            //     return error_code( );
-            // } ); //remove wrapper? static
-        }
-        
-        string TCPIP::get_local_endpoint( void )
-        {
-            if ( m_pimpl->socket == -1 ) return "";
-            
-            const uint16_t port = ntohs( m_pimpl->endpoint.sin_port );
-            const string address = inet_ntoa( m_pimpl->endpoint.sin_addr );
-            //if version 6 and brackets [::1]:80
-            return address + ":" + to_string( port );
-        }
-        
-        string TCPIP::get_remote_endpoint( void )
-        {
-            if ( m_pimpl->socket == -1 ) return "";
-            
-            struct sockaddr_in endpoint;
-            socklen_t size = sizeof( endpoint );
-            
-            getpeername( m_pimpl->socket, reinterpret_cast< struct sockaddr*>( &endpoint ), &size );
-            
-            const uint16_t port = ntohs( endpoint.sin_port );
-            const string address = inet_ntoa( endpoint.sin_addr );
-            //if version 6 and brackets [::1]:80
-            return address + ":" + to_string( port );
+            return;
         }
     }
 }
