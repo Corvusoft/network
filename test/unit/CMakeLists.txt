@@ -22,7 +22,7 @@ target_link_libraries( constructor_unit_test_suite ${STATIC_LIBRARY_NAME} )
 add_test( constructor_unit_test_suite ${EXECUTABLE_OUTPUT_PATH}/constructor_unit_test_suite )
 
 add_executable( consume_unit_test_suite ${SOURCE_DIR}/tcpip/consume.cpp )
-target_link_libraries( consume_unit_test_suite ${SHARED_LIBRARY_NAME} )
+target_link_libraries( consume_unit_test_suite ${STATIC_LIBRARY_NAME} )
 add_test( consume_unit_test_suite ${EXECUTABLE_OUTPUT_PATH}/consume_unit_test_suite )
 
 add_executable( destructor_unit_test_suite ${SOURCE_DIR}/tcpip/destructor.cpp )

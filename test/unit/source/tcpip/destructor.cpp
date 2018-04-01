@@ -6,7 +6,7 @@
 
 //External Includes
 #include <catch.hpp>
-#include <corvusoft/mock/run_loop.hpp>
+#include <corvusoft/stub/run_loop.hpp>
 
 //System Namespaces
 using std::make_shared;
@@ -15,7 +15,7 @@ using std::make_shared;
 using corvusoft::network::TCPIP;
 
 //External Namespaces
-using corvusoft::mock::RunLoop;
+using corvusoft::stub::RunLoop;
 
 TEST_CASE( "Destruct instance." )
 {
