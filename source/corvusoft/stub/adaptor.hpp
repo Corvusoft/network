@@ -57,37 +57,42 @@ namespace corvusoft
                 //Functionality
                 std::error_code setup( const std::shared_ptr< const core::Settings >& settings = nullptr ) override
                 {
-                    return;
+                    return std::error_code( );
                 }
                 
                 std::error_code teardown( void ) override
                 {
-                    return;
+                    return std::error_code( );
                 }
                 
                 void open( const std::shared_ptr< const core::Settings >&, const std::function< std::error_code ( const std::shared_ptr< network::Adaptor >, const std::error_code ) > completion_handler ) override
                 {
-                    completion_handler( shared_from_this( ), std::error_code( ) );
+                    if ( completion_handler )
+                        completion_handler( shared_from_this( ), std::error_code( ) );
                 }
                 
                 void close( const std::function< std::error_code ( const std::shared_ptr< network::Adaptor >, const std::error_code ) > completion_handler ) override
                 {
-                    completion_handler( shared_from_this( ), std::error_code( ) );
+                    if ( completion_handler )
+                        completion_handler( shared_from_this( ), std::error_code( ) );
                 }
                 
                 void consume( const std::function< std::error_code ( const std::shared_ptr< network::Adaptor >, const core::Bytes, const std::error_code ) > completion_handler ) override
                 {
-                    completion_handler( shared_from_this( ), m_data, std::error_code( ) );
+                    if ( completion_handler )
+                        completion_handler( shared_from_this( ), m_data, std::error_code( ) );
                 }
                 
                 void produce( const core::Bytes& data, const std::function< std::error_code ( const std::shared_ptr< network::Adaptor >, const std::size_t, const std::error_code ) > completion_handler ) override
                 {
-                    completion_handler( shared_from_this( ), data.size( ), std::error_code( ) );
+                    if ( completion_handler )
+                        completion_handler( shared_from_this( ), data.size( ), std::error_code( ) );
                 }
                 
                 void listen( const std::shared_ptr< const core::Settings >&, const std::function< std::error_code ( const std::shared_ptr< network::Adaptor >, const std::error_code ) > connection_handler ) override
                 {
-                    connection_handler( shared_from_this( ), std::error_code( ) );
+                    if ( completion_handler )
+                        connection_handler( shared_from_this( ), std::error_code( ) );
                 }
                 
                 //Getters
