@@ -36,7 +36,7 @@ namespace corvusoft
     {
         //Forward Declarations
         
-        class Adaptor final : public core::Adaptor
+        class Adaptor final : public network::Adaptor
         {
             public:
                 //Friends
