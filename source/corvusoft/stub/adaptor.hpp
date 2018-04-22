@@ -44,7 +44,7 @@ namespace corvusoft
                 //Definitions
                 
                 //Constructors
-                Adaptor( const std::shared_ptr< core::RunLoop >& )
+                Adaptor( const std::shared_ptr< core::RunLoop >& ) : network::Adaptor( )
                 {
                     return;
                 }
@@ -65,27 +65,27 @@ namespace corvusoft
                     return;
                 }
                 
-                void open( const std::shared_ptr< const core::Settings >&, const std::function< std::error_code ( const std::shared_ptr< Adaptor >, const std::error_code ) > completion_handler ) override
+                void open( const std::shared_ptr< const core::Settings >&, const std::function< std::error_code ( const std::shared_ptr< network::Adaptor >, const std::error_code ) > completion_handler ) override
                 {
                     completion_handler( std::shared_from_this( ), std::error_code( ) );
                 }
                 
-                void close( const std::function< std::error_code ( const std::shared_ptr< Adaptor >, const std::error_code ) > completion_handler ) override
+                void close( const std::function< std::error_code ( const std::shared_ptr< network::Adaptor >, const std::error_code ) > completion_handler ) override
                 {
                     completion_handler( std::shared_from_this( ), std::error_code( ) );
                 }
                 
-                void consume( const std::function< std::error_code ( const std::shared_ptr< Adaptor >, const core::Bytes, const std::error_code ) > completion_handler ) override
+                void consume( const std::function< std::error_code ( const std::shared_ptr< network::Adaptor >, const core::Bytes, const std::error_code ) > completion_handler ) override
                 {
                     completion_handler( std::shared_from_this( ), m_data, std::error_code( ) );
                 }
                 
-                void produce( const core::Bytes& data, const std::function< std::error_code ( const std::shared_ptr< Adaptor >, const std::size_t, const std::error_code ) > completion_handler ) override
+                void produce( const core::Bytes& data, const std::function< std::error_code ( const std::shared_ptr< network::Adaptor >, const std::size_t, const std::error_code ) > completion_handler ) override
                 {
                     completion_handler( std::shared_from_this( ), data.size( ), std::error_code( ) );
                 }
                 
-                void listen( const std::shared_ptr< const core::Settings >&, const std::function< std::error_code ( const std::shared_ptr< Adaptor >, const std::error_code ) > connection_handler ) override
+                void listen( const std::shared_ptr< const core::Settings >&, const std::function< std::error_code ( const std::shared_ptr< network::Adaptor >, const std::error_code ) > connection_handler ) override
                 {
                     connection_handler( std::shared_from_this( ), std::error_code( ) );
                 }
