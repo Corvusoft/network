@@ -70,7 +70,7 @@ add_subdirectory( "${PROJECT_SOURCE_DIR}/test/integration" )
 # Install
 #
 file( GLOB ARTIFACTS "source/corvusoft/network/*.hpp" )
-install( FILES ${ARTIFACTS} DESTINATION "${CMAKE_INSTALL_PREFIX}/include/corvusoft/core" )
+install( FILES ${ARTIFACTS} DESTINATION "${CMAKE_INSTALL_PREFIX}/include/corvusoft/network" )
 
 file( GLOB ARTIFACTS "source/corvusoft/stub/*.hpp" )
 install( FILES ${ARTIFACTS} DESTINATION "${CMAKE_INSTALL_PREFIX}/include/corvusoft/stub" )
