@@ -91,7 +91,7 @@ namespace corvusoft
                 
                 void listen( const std::shared_ptr< const core::Settings >&, const std::function< std::error_code ( const std::shared_ptr< network::Adaptor >, const std::error_code ) > connection_handler ) override
                 {
-                    if ( completion_handler )
+                    if ( connection_handler )
                         connection_handler( shared_from_this( ), std::error_code( ) );
                 }
                 
