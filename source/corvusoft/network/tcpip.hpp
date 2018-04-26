@@ -2,8 +2,7 @@
  * Copyright 2013-2018, Corvusoft Ltd, All Rights Reserved.
  */
 
-#ifndef _CORVUSOFT_NETWORK_TCPIP_H
-#define _CORVUSOFT_NETWORK_TCPIP_H 1
+#pragma once
 
 //System Includes
 #include <string>
@@ -116,5 +115,3 @@ namespace corvusoft
         };
     }
 }
-
-#endif  /* _CORVUSOFT_NETWORK_TCPIP_H */

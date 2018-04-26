@@ -2,8 +2,7 @@
  * Copyright 2013-2018, Corvusoft Ltd, All Rights Reserved.
  */
 
-#ifndef _CORVUSOFT_NETWORK_DETAIL_TCPIP_IMPL_H
-#define _CORVUSOFT_NETWORK_DETAIL_TCPIP_IMPL_H 1
+#pragma once
 
 //System Includes
 #include <poll.h>
@@ -167,5 +166,3 @@ namespace corvusoft
         }
     }
 }
-
-#endif  /* _CORVUSOFT_NETWORK_DETAIL_TCPIP_IMPL_H */
